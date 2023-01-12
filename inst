@@ -224,14 +224,14 @@ EOF
 locales() {
 	sleep 1 && echo
 	printf "Setting locale..." && sleep 1
-	arch-chroot /mnt apt install locales -y
+	arch-chroot /mnt apt install locales -y -qq
 	arch-chroot /mnt dpkg-reconfigure locales
 }
 
 xkb_cons() {
 	sleep 1 && echo
 	printf "Setting up console... "
-	arch-chroot /mnt apt install console-setup keyboard-configuration -y
+	arch-chroot /mnt apt install console-setup keyboard-configuration -y -qq
 }
 
 set_pass() {
@@ -255,58 +255,30 @@ set_default_user() {
 	arch-chroot /mnt useradd -m "$name"
 	printf '%s\n' "Password for $name (will not echo):"
 	arch-chroot /mnt passwd "$name"
-	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev "$name"
+	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
 	arch-chroot /mnt usermod -s /bin/bash "$name"
 }
 
 # ask the user to choose extra packages (or not)
 pkg_sets() {
-	read -r -p "By default, only a base system is installed. You can choose extra \"sets\" for a more complete installation.
+	read -r -p "By default, only a base system Miniuan is installed. You can choose Fluxuan for a more complete installation.
 	The choices are:
 
-1) Base only (no extra packages, still includes vim + tmux)
-2) Base + X11 (inclues: xserver-xorg-core, xinit, dwm, st and dmenu+scripts)
-3) Base + X11 + Userland (extras: vifm, mutt, mpv, newsboat, calcurse, dunst, zathura ...)
+1) Miniuan (base no x to build up yourself)
+2) Fluxuan (Fluxuan`s packages and configuration)
 
 Select by entering corresponding number (defaults to 1): " choice
 	case "$choice" in
 		1) ;; # do nothing, base is already installed
-		2) arch-chroot /mnt xargs apt install <x11.pkgs -y 
-			inst_suckless_base ;;
-		3) arch-chroot /mnt xargs apt install <x11.pkgs -y 
-			arch-chroot /mnt xargs apt install <userland.pkgs -y
-			inst_suckless_base
-			ask_dots ;;
-		*) ;; # same as 1
+		2) arch-chroot /mnt xargs apt install <fluxuan.pkgs -y -qq ;;
+		3) arch-chroot /mnt xargs apt install <miniuan.pkgs -y -qq ;;
+		*) arch-chroot /mnt xargs apt install <fluxuan.pkgs -y -qq ;; # same as 1
 	esac
 }
 
-inst_suckless_base() {
-	echo
-	printf '%s\n' "Building custom suckless tools..." && sleep 1
-	mkdir -p /mnt/etc/skel/.local/
-	cp -r .local/src /mnt/etc/skel/.local/
-	arch-chroot /mnt /bin/bash <<"EOT"
-cd /etc/skel/.local/src/dwm
-make
-make clean install
-EOT
-
-	arch-chroot /mnt /bin/bash <<"EOT"
-cd /etc/skel/.local/src/dmenu
-make
-make clean install
-EOT
-
-	arch-chroot /mnt /bin/bash <<"EOT"
-cd /etc/skel/.local/src/st
-make
-make clean install
-EOT
-}
 
 ask_dots() {
-	read -r -p "Do you wish to install the dotfiles from this live iso onto your system? (Y/n): " yn
+	read -r -p "Do you wish to Continue? (Y/n): " yn
 	case "$yn" in
 		n) ;; # do nothing
 		*) set_dots ;;
@@ -315,10 +287,25 @@ ask_dots() {
 
 set_dots() {
 	echo
-	printf '%s\n' "Setting up user dotfiles..."
-	cp -r /etc/skel /mnt/etc/
-	rm /mnt/etc/skel/install.sh
-	chmod +x /mnt/etc/skel/.local/bin/{chwall-dmenu,mpvload,poweroffreboot,usbmount,usbpoweroff,usbunmount}
+	printf '%s\n' "Setting up your Fluxuan Machine"
+	if [ -d "/mnt/etc/skel" ]; then
+	  : # do nothing
+	else
+	  mkdir /mnt/etc/skel
+fi
+
+	curl -LJO raw.githubusercontent.com/crentz/fx/main/fxins.tar.xz /mnt/etc/skel/
+	tar -zxvf fxins.tar.xz >/dev/null
+	rm /mnt/etc/skel/fx/installer
+	mv /mnt/etc/skel/{fbscreensize,Byef,CCP} /mnt/usr/bin/
+	mv /mnt/etc/skel/wallpaper /mnt/usr/share/
+	mv /mnt/etc/skel/Mythos /mnt/usr/share/themes/
+	mv /mnt/etc/skel/Gruvbox /mnt/usr/share/icons/
+	mv /mnt/etc/skel/fx /mnt/usr/share/
+	mv /mnt/etc/skel/fxslim /mnt/usr/share/slim/themes/
+	sed -i 's/desktop-slim-theme/fxslim/' /mnt/etc/slim.conf
+	chmod +x /mnt/usr/bin/{Byef,CCP,fbscreensize}
+	rm /mnt/boot/grub/splash.png
 }
 
 setup_grub() {
@@ -330,16 +317,26 @@ setup_grub() {
 	if [ "$_mode" == "bios" ]; then
 		arch-chroot /mnt apt install grub-pc -y
 		arch-chroot /mnt grub-install /dev/"$_disk"
+		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /mnt/etc/default/grub
+		cp /mnt/usr/share/fx/splash.png /mnt/boot/grub/
 		arch-chroot /mnt update-grub
 	else
 		arch-chroot /mnt apt install grub-efi-amd64 -y
 		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi
+		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /mnt/etc/default/grub
+		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /mnt/etc/default/grub
+		cp /mnt/usr/share/fx/splash.png /mnt/boot/grub/
 		arch-chroot /mnt update-grub
 	fi
 }
 
 finish() {
-	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
+	read -r -p "Installation has finished. Press R to reboot, E to exit and continue in the live environment.
 > " re
 	case "$re" in
 		R) reboot ;;
