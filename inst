@@ -27,7 +27,7 @@ fi
 CONF=disk.conf
 
 get_deps() {
-	printf '%s\n' "Please Wait Getting installer`s dependencies" &&
+	printf '%s\n' "Please Wait, Getting installer`s dependencies" &&
 	apt update && apt install debootstrap arch-install-scripts -y >/dev/null
 }
 
@@ -150,7 +150,7 @@ mk_part() {
 
 bootstrap() {
 	echo
-	printf '%s\n' "Please wait installing base system" && sleep 1
+	printf '%s\n' "Please wait, Installing base system" && sleep 1
 	/usr/sbin/debootstrap --variant=minbase bullseye /mnt http://deb.devuan.org/merged
 }
 
@@ -269,9 +269,9 @@ pkg_sets() {
 Select by entering corresponding number (defaults to 1): " choice
 	case "$choice" in
 		1) ;; # do nothing, base is already installed
-		2) arch-chroot /mnt xargs apt install <fluxuan.pkgs -y -qq ;;
-		3) arch-chroot /mnt xargs apt install <miniuan.pkgs -y -qq ;;
-		*) arch-chroot /mnt xargs apt install <fluxuan.pkgs -y -qq ;; # same as 1
+		2) arch-chroot /mnt xargs apt install </usr/share/fx/installer/fluxuan.pkgs -y -qq ;;
+		3) arch-chroot /mnt xargs apt install </usr/share/fx/installer/miniuan.pkgs -y -qq ;;
+		*) arch-chroot /mnt xargs apt install </usr/share/fx/installer/fluxuan.pkgs -y -qq ;; # same as 1
 	esac
 }
 
@@ -293,18 +293,30 @@ set_dots() {
 	  mkdir /mnt/etc/skel
 fi
 
-	curl -LJO raw.githubusercontent.com/crentz/fx/main/fxins.tar.xz /mnt/etc/skel/
-	tar -zxvf fxins.tar.xz >/dev/null
-	rm /mnt/etc/skel/fx/installer
-	mv /mnt/etc/skel/{fbscreensize,Byef,CCP} /mnt/usr/bin/
-	mv /mnt/etc/skel/wallpaper /mnt/usr/share/
-	mv /mnt/etc/skel/Mythos /mnt/usr/share/themes/
-	mv /mnt/etc/skel/Gruvbox /mnt/usr/share/icons/
-	mv /mnt/etc/skel/fx /mnt/usr/share/
-	mv /mnt/etc/skel/fxslim /mnt/usr/share/slim/themes/
-	sed -i 's/desktop-slim-theme/fxslim/' /mnt/etc/slim.conf
-	chmod +x /mnt/usr/bin/{Byef,CCP,fbscreensize}
-	rm /mnt/boot/grub/splash.png
+	arch-chroot /mnt curl -LJO raw.githubusercontent.com/crentz/fx/main/fxi.tar.xz /etc/skel/
+	arch-chroot /mnt tar -xf /etc/skel/fxins.tar.xz >/dev/null
+	arch-chroot /mnt rm /etc/skel/fxin.tar.xz
+	arch-chroot /mnt rm /etc/skel/fx/installer
+	arch-chroot /mnt mv /etc/skel/{fbscreensize,Byef,CCP} /mnt/usr/bin/
+	arch-chroot /mnt mv /etc/skel/wallpaper /usr/share/
+	arch-chroot /mnt mv /etc/skel/Mythos /usr/share/themes/
+	arch-chroot /mnt mv /etc/skel/Gruvbox /usr/share/icons/
+	arch-chroot /mnt mv /etc/skel/fx /usr/share/
+	arch-chroot /mnt mv /etc/skel/fxslim /usr/share/slim/themes/
+	arch-chroot /mnt mv /etc/skel/start.wav /usr/share/sounds/ 
+	arch-chroot /mnt sed -i 's/desktop-slim-theme/fxslim/' /etc/slim.conf
+	arch-chroot /mnt chmod +x /usr/bin/{Byef,CCP,fbscreensize}
+	arch-chroot /mnt rm /boot/grub/splash.png
+	arch-chroot /mnt sed -i 's/false/true/' /etc/NetworkManager/NetworkManager.conf
+	arch-chroot /mnt rm -rf /usr/share/fluxbox/styles
+	arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/motd
+	arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/issue
+	arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/issue.net
+	arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/os-release
+	arch-chroot /mnt echo "vm.swappiness = 10" >>  /etc/sysctl.d/fluxuanctl.conf
+	arch-chroot /mnt echo "vm.dirty_ratio = 40" >>  /etc/sysctl.d/fluxuanctl.conf
+	arch-chroot /mnt echo "vm.dirty_background_ratio = 20" >>  /etc/sysctl.d/fluxuanctl.conf
+	arch-chroot /mnt echo "vm.vfs_cache_pressure = 50" >> /etc/sysctl.d/fluxuanctl.conf
 }
 
 setup_grub() {
@@ -316,20 +328,20 @@ setup_grub() {
 	if [ "$_mode" == "bios" ]; then
 		arch-chroot /mnt apt install grub-pc -y
 		arch-chroot /mnt grub-install /dev/"$_disk"
-		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /mnt/etc/default/grub
-		cp /mnt/usr/share/fx/splash.png /mnt/boot/grub/
+		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /etc/default/grub
+		arch-chroot /mnt cp /usr/share/fx/splash.png /boot/grub/
 		arch-chroot /mnt update-grub
 	else
 		arch-chroot /mnt apt install grub-efi-amd64 -y
 		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi
-		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /mnt/etc/default/grub
-		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /mnt/etc/default/grub
-		cp /mnt/usr/share/fx/splash.png /mnt/boot/grub/
+		arch-chroot /mnt sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=3/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/GRUB_THEME/#GRUB_THEME/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/Devuan/Fluxuan/' /etc/default/grub
+		arch-chroot /mnt sed -i 's/Debian/Fluxuan/' /etc/default/grub
+		arch-chroot /mnt cp /usr/share/fx/splash.png /boot/grub/
 		arch-chroot /mnt update-grub
 	fi
 }
