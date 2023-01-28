@@ -1,0 +1,336 @@
+#!/bin/bash
+
+CONF=disk.conf
+rsync_excludes=${rsync_excludes:="/usr/share/fx/installer/exclude.list"}
+error_log=${error_log:="~/installer_error.log"}
+install_dep () {
+apt update && apt install arch-install-scripts -y -qq >>/dev/null
+
+}
+welcome_msg () {
+echo
+printf '%s\n' "Welcome to Fluxuan Linux Installer, i hope this installer will be fast and easy to use.
+
+This installer will guide you to the rest of the setup process.
+
+Thank you for your interest in Fluxuan Linux.
+
+https://fluxuan.org"
+
+}
+check_root (){
+[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
+}
+# function to exit the script if there are errors
+check_exit () {
+exit_code="$?"
+[[ $exit_code -eq 0 ]] || { echo "
+  
+  Exit due to error:  $exit_code
+  See $error_log for details.
+  "
+  exit 1 ; }
+}
+error_log () {
+# Record errors in a logfile.
+exec 2>"$error_log"
+
+if [[ $DEBUG = "yes" ]] ; then
+	set -x
+fi
+}
+
+# writing to disk.conf
+d_conf() {
+	local _conf=$1 _value=$2
+	printf '%s\n' "${_conf}=${_value}" >> "$CONF"
+}
+
+# Parsing values from disk.conf
+d_read() {
+	local _conf=$1
+	grep "${_conf}" "$CONF" | cut -d '=' -f2
+}
+
+mk_disk() {
+	clear
+	echo
+	printf '%s\n' "Disk partitioning. 
+	Your available devices are: "
+	echo
+	lsblk -lp | awk '/disk/ { print $1, "(" $4 ")" }' | cut -d '/' -f3
+	echo
+	read -r -p "Which disk should the system be installed on? (e.g. sdX): " disk
+	d_conf DISK "$disk"
+	echo
+	read -r -p "Will you boot in bios or EFI mode (-- write bios or EFI --)? " mode
+	d_conf MODE "$mode"
+	echo
+	printf '%s\n' "Custom partitioning schemes are not yet supported.
+	The default scheme will be:
+a 500mb boot partition on /dev/${disk}1
+a root partition the size of your choosing on /dev/${disk}2"
+	echo
+	read -r -p "Proceed? (all data on $disk will be deleted, so make sure you backed up anything important) (Y/n): " yesno
+	if [ "$yesno" == "no" ]; then
+		printf '%s\n' "Exiting script... Start again."
+		rm "$CONF"
+	else
+		d_conf BOOTP "$disk"1
+		d_conf ROOTP "$disk"2
+		ask_part
+	fi
+}
+
+# Asking user for size of partitions
+ask_part() {
+	echo
+	read -r -p "Choose the size of root in GB (e.g. 25): " roots
+	d_conf ROOTS "$roots"
+}
+
+# Partitioning disk and running mkfs.
+mk_part() {
+	local _disk _mode _roots
+	_disk=$(d_read DISK)
+	_mode=$(d_read MODE)
+	_roots=$(d_read ROOTS)
+	echo
+	printf '%s\n' "Partitioning /dev/$_disk."
+	sfdisk --delete /dev/"$_disk" && sleep 2
+	partprobe /dev/"$_disk" && sleep 1
+	if [ "$_mode" == "bios" ]; then
+		(
+echo o # Create a new empty DOS partition table
+echo n # Add a new partition
+echo p # Primary partition
+echo 1 # Partition number
+echo 2048  # First sector (Accept default: 1)
+echo +500M  # Last sector (Accept default: varies)
+echo w # Write changes
+) | fdisk /dev/"$_disk"
+		sfdisk -A /dev/"$_disk" 1
+	else
+				(
+echo g # EFI boot part
+echo o # Create a new empty DOS partition table
+echo n # Add a new partition
+echo p # Primary partition
+echo 1 # Partition number
+echo 2048  # First sector (Accept default: 1)
+echo +500M  # Last sector (Accept default: varies)
+echo w # Write changes
+) | fdisk /dev/"$_disk"
+		fdisk --part-type /dev/"$_disk" 1 EF
+	fi
+			(
+echo n # Add a new partition
+echo p # Primary partition
+echo 2 # Partition number
+echo   # First sector (Accept default: 1)
+echo +"$_roots"G  # Last sector (Accept default: varies)
+echo w # Write changes
+) | fdisk /dev/"$_disk" && sleep 2
+
+	partprobe /dev/"$_disk" && sleep 1
+	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
+	if [ "$_mode" == "bios" ]; then
+		mkfs.ext4 /dev/"$_disk"1
+	else
+		mkfs.fat -F 32 /dev/"$_disk"1
+	fi
+	mkfs.ext4 /dev/"$_disk"2
+
+	printf '%s\n' "Mounting Partitions" && sleep 1
+	mount /dev/"$_disk"2 /mnt
+	if [ "$_mode" == "bios" ]; then
+		mkdir -p /mnt/boot
+		mount /dev/"$_disk"1 /mnt/boot
+	else
+		mkdir -p /mnt/boot/efi
+		mount /dev/"$_disk"1 /mnt/boot/efi
+	fi
+}
+
+check_excludes () {
+if ! [[ -f  $rsync_excludes ]] ; then
+    echo 
+    printf 's/n'"
+ There is no rsync excludes file, or its name does not match what
+ this script expects. You should let the script create one, or if
+ you have a custom excludes file, and you know what you're doing,
+ you can exit the script and edit the rsync_excludes variable at 
+ the top so that it matches the name and path of your custom file. "
+    rsync_excludes="$(pwd)/exclude.list"
+    echo " Creating rsync excludes file, $rsync_excludes
+ "
+    sleep 2
+    cat > "$rsync_excludes" <<EOF
+# It is safe to delete this file after installation.
+- /dev/*
+- /cdrom/*
+- /media/*
+- /target
+- /swapfile
+- /mnt/*
+- /sys/*
+- /proc/*
+- /tmp/*
+- /live
+- /boot/grub/grub.cfg
+- /boot/grub/menu.lst
+- /boot/grub/device.map
+- /etc/udev/rules.d/70-persistent-cd.rules
+- /etc/udev/rules.d/70-persistent-net.rules
+- /etc/fstab
+- /etc/mtab
+- /home/snapshot
+- /home/*/.gvfs
+EOF
+check_exit
+chmod 666 "$rsync_excludes"
+fi 
+}
+
+copy_sys () {
+# copy everything over except the things listed in the exclude list
+echo -e "\n Copying system to new partition...\n"
+rsync -axAX / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
+
+# copy the real update-initramfs back in place
+echo -e "\n Copying update-initramfs...\n"
+if [[ -f /mnt/usr/sbin/update-initramfs.distrib ]] ; then
+    cp /mnt/usr/sbin/update-initramfs.distrib /mnt/usr/sbin/update-initramfs
+fi
+if [[ -f /mnt/usr/sbin/update-initramfs.debian ]] ; then
+    cp /mnt/usr/sbin/update-initramfs.debian /mnt/usr/sbin/update-initramfs
+fi
+}
+
+mount_arch-chroot () {
+echo -e "\n Mounting dev, sys and proc...\n"
+mount --bind /dev /mnt/dev ; check_exit 
+mount --bind /proc /mnt/proc ; check_exit 
+mount --bind /sys /mnt/sys ; check_exit 
+
+}
+
+
+gen_fstab() {
+	echo
+	printf '%s\n' "Generating fstab..." && sleep 1
+	genfstab -U /mnt >> /mnt/etc/fstab
+	arch-chroot /mnt fallocate -l 1G /swapfile
+	arch-chroot /mnt mkswap /swapfile
+	arch-chroot /mnt swapon /swapfile
+	arch-chroot /mnt echo "/swapfile none swap sw 0 0" >> /etc/fstab
+}
+
+timezone() {
+	echo
+	printf '%s\n' "Setting timezone..." && sleep 1
+	arch-chroot /mnt dpkg-reconfigure tzdata
+}
+
+set_hostname() {
+	echo
+	read -r -p "Hostname for this machine: " hostname
+	echo "$hostname" > /mnt/etc/hosts
+	cat <<EOF > /mnt/etc/hosts
+127.0.0.1	localhost
+127.0.1.1	$hostname
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+}
+
+locales() {
+	sleep 1 && echo
+	printf "Setting locale..." && sleep 1
+	arch-chroot /mnt dpkg-reconfigure locales
+}
+
+set_pass() {
+	echo
+	printf '%s\n' "Enter password for the root account (will not echo)"
+	arch-chroot /mnt passwd
+	printf '%s\n' "Root password set. You may wish to disable the root account with passwd -l later on."
+}
+
+set_wheel() {
+	echo
+	printf '%s\n' "Setting up wheel group" && sleep 1
+	sed -i '15 s/^# //' /mnt/etc/pam.d/su
+	arch-chroot /mnt addgroup --system wheel
+	echo "permit :wheel" > /mnt/etc/doas.conf
+}
+
+set_default_user() {
+	arch-chroot /mnt deluser fluxuan
+	echo
+	read -r -p "Enter the name of default user: " name
+	arch-chroot /mnt useradd -m "$name"
+	printf '%s\n' "Password for $name (will not echo):"
+	arch-chroot /mnt passwd "$name"
+	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+	arch-chroot /mnt usermod -s /bin/bash "$name"
+}
+
+
+setup_grub() {
+	local _mode _disk
+	echo
+	printf '%s\n' "seting up the GRUB bootloader..."
+	_mode=$(d_read MODE)
+	_disk=$(d_read DISK)
+	if [ "$_mode" == "bios" ]; then
+		arch-chroot /mnt grub-install /dev/"$_disk"
+		arch-chroot /mnt update-grub
+	else
+		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi
+		arch-chroot /mnt grub-install /dev/"$_disk"
+		arch-chroot /mnt update-grub
+	fi
+}
+
+umount_arch-chroot () {
+arch-chroot /mnt apt update && apt upgrade -y -qq
+arch-chroot /mnt rm /var/lib/dbus/machine-id && rm -rf /tmp/*
+umount /proc /sys /dev
+exit
+}
+
+finish() {
+	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
+> " re
+	case "$re" in
+		R) reboot ;;
+		E) exit ;;
+		*) ;;
+	esac
+}
+
+do_install() {
+	printf '%s\n' "Launching the installer..."
+	welcome_msg
+	install_dep
+	mk_disk
+	mk_part
+	check_excludes
+	copy_sys
+	mount_arch-chroot
+	gen_fstab
+	timezone
+	set_hostname
+	locale
+	set_pass
+	set_wheel
+	set_default_user
+	setup_grub
+	umount_arch-chroot
+	finish
+}
+
+do_install
