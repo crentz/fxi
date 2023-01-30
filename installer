@@ -16,7 +16,7 @@ This installer will guide you to the rest of the setup process.
 Thank you for your interest in Fluxuan Linux.
 
 https://fluxuan.org"
-
+sleep 5
 }
 check_root (){
 [[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
@@ -97,7 +97,8 @@ mk_part() {
 	_roots=$(d_read ROOTS)
 	echo
 	printf '%s\n' "Partitioning /dev/$_disk."
-	sfdisk --delete /dev/"$_disk" && sleep 2
+	sfdisk --delete /dev/"$_disk"
+	umount /dev/"$_disk"
 	partprobe /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(
@@ -154,16 +155,8 @@ echo w # Write changes
 
 check_excludes () {
 if ! [[ -f  $rsync_excludes ]] ; then
-    echo 
-    printf 's/n'"
- There is no rsync excludes file, or its name does not match what
- this script expects. You should let the script create one, or if
- you have a custom excludes file, and you know what you're doing,
- you can exit the script and edit the rsync_excludes variable at 
- the top so that it matches the name and path of your custom file. "
     rsync_excludes="$(pwd)/exclude.list"
-    echo " Creating rsync excludes file, $rsync_excludes
- "
+    echo " Creating rsync excludes file, $rsync_excludes "
     sleep 2
     cat > "$rsync_excludes" <<EOF
 # It is safe to delete this file after installation.
@@ -207,15 +200,6 @@ if [[ -f /mnt/usr/sbin/update-initramfs.debian ]] ; then
 fi
 }
 
-mount_arch-chroot () {
-echo -e "\n Mounting dev, sys and proc...\n"
-mount --bind /dev /mnt/dev ; check_exit 
-mount --bind /proc /mnt/proc ; check_exit 
-mount --bind /sys /mnt/sys ; check_exit 
-
-}
-
-
 gen_fstab() {
 	echo
 	printf '%s\n' "Generating fstab..." && sleep 1
@@ -255,7 +239,7 @@ locales() {
 set_pass() {
 	echo
 	printf '%s\n' "Enter password for the root account (will not echo)"
-	arch-chroot /mnt passwd
+	arch-chroot /mnt passwd root
 	printf '%s\n' "Root password set. You may wish to disable the root account with passwd -l later on."
 }
 
@@ -268,10 +252,10 @@ set_wheel() {
 }
 
 set_default_user() {
-	arch-chroot /mnt deluser fluxuan
 	echo
 	read -r -p "Enter the name of default user: " name
-	arch-chroot /mnt useradd -m "$name"
+	arch-chroot /mnt usermod -m "$name" fluxuan
+	arch-chroot /mnt usermod -m -d /home/"$name" "$name"
 	printf '%s\n' "Password for $name (will not echo):"
 	arch-chroot /mnt passwd "$name"
 	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
@@ -295,12 +279,6 @@ setup_grub() {
 	fi
 }
 
-umount_arch-chroot () {
-arch-chroot /mnt apt update && apt upgrade -y -qq
-arch-chroot /mnt rm /var/lib/dbus/machine-id && rm -rf /tmp/*
-umount /proc /sys /dev
-exit
-}
 
 finish() {
 	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
@@ -320,7 +298,6 @@ do_install() {
 	mk_part
 	check_excludes
 	copy_sys
-	mount_arch-chroot
 	gen_fstab
 	timezone
 	set_hostname
@@ -329,7 +306,6 @@ do_install() {
 	set_wheel
 	set_default_user
 	setup_grub
-	umount_arch-chroot
 	finish
 }
 
