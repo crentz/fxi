@@ -68,8 +68,12 @@ mk_disk() {
 	echo
 	printf '%s\n' "Custom partitioning schemes are not yet supported.
 	The default scheme will be:
-a 500mb boot partition on /dev/${disk}1
-a root partition the size of your choosing on /dev/${disk}2"
+###################################################################################
+
+a 200mb boot partition on /dev/${disk}1
+a root partition of the remaining space on /dev/${disk}2
+
+###################################################################################"
 	echo
 	read -r -p "Proceed? (all data on $disk will be deleted, so make sure you backed up anything important) (Y/n): " yesno
 	if [ "$yesno" == "no" ]; then
@@ -82,56 +86,61 @@ a root partition the size of your choosing on /dev/${disk}2"
 	fi
 }
 
-# Asking user for size of partitions
-ask_part() {
-	echo
-	read -r -p "Choose the size of root in GB (e.g. 25): " roots
-	d_conf ROOTS "$roots"
-}
 
 # Partitioning disk and running mkfs.
 mk_part() {
 	local _disk _mode _roots
 	_disk=$(d_read DISK)
 	_mode=$(d_read MODE)
-	_roots=$(d_read ROOTS)
 	echo
 	printf '%s\n' "Partitioning /dev/$_disk."
-	sfdisk --delete /dev/"$_disk"
 	umount /dev/"$_disk"
+	sfdisk --delete /dev/"$_disk"
 	partprobe /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(
-echo o # Create a new empty DOS partition table
-echo n # Add a new partition
-echo p # Primary partition
-echo 1 # Partition number
-echo 2048  # First sector (Accept default: 1)
-echo +500M  # Last sector (Accept default: varies)
-echo w # Write changes
-) | fdisk /dev/"$_disk"
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
+  o # clear the in memory partition table
+  n # new partition
+  p # primary partition
+  1 # partition number 1
+    # default - start at beginning of disk 
+  +200M # 200 MB boot parttion
+  n # new partition
+  p # primary partition
+  2 # partion number 2
+    # default, start immediately after preceding partition
+    # default, extend partition to end of disk
+  a # make a partition bootable
+  1 # bootable partition is partition 1 -- /dev/sda1
+  p # print the in-memory partition table
+  w # write the partition table
+  q # and we're done
+EOF
 		sfdisk -A /dev/"$_disk" 1
 	else
 				(
-echo g # EFI boot part
-echo o # Create a new empty DOS partition table
-echo n # Add a new partition
-echo p # Primary partition
-echo 1 # Partition number
-echo 2048  # First sector (Accept default: 1)
-echo +500M  # Last sector (Accept default: varies)
-echo w # Write changes
-) | fdisk /dev/"$_disk"
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
+  o # clear the in memory partition table
+  n # new partition
+  p # primary partition
+  1 # partition number 1
+    # default - start at beginning of disk 
+  +200M # 200 MB boot parttion
+  n # new partition
+  p # primary partition
+  2 # partion number 2
+    # default, start immediately after preceding partition
+    # default, extend partition to end of disk
+  a # make a partition bootable
+  1 # bootable partition is partition 1 -- /dev/sda1
+  p # print the in-memory partition table
+  w # write the partition table
+  q # and we're done
+EOF
 		fdisk --part-type /dev/"$_disk" 1 EF
 	fi
 			(
-echo n # Add a new partition
-echo p # Primary partition
-echo 2 # Partition number
-echo   # First sector (Accept default: 1)
-echo +"$_roots"G  # Last sector (Accept default: varies)
-echo w # Write changes
-) | fdisk /dev/"$_disk" && sleep 2
 
 	partprobe /dev/"$_disk" && sleep 1
 	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
