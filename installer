@@ -98,52 +98,18 @@ mk_part() {
 	sfdisk --delete /dev/"$_disk"
 	partprobe /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
-		(
-sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
-  o # clear the in memory partition table
-  n # new partition
-  p # primary partition
-  1 # partition number 1
-    # default - start at beginning of disk 
-  +200M # 200 MB boot parttion
-  n # new partition
-  p # primary partition
-  2 # partion number 2
-    # default, start immediately after preceding partition
-    # default, extend partition to end of disk
-  a # make a partition bootable
-  1 # bootable partition is partition 1 -- /dev/sda1
-  p # print the in-memory partition table
-  w # write the partition table
-  q # and we're done
-EOF 
-sfdisk -A /dev/"$_disk" 1
-)
-		
+		(echo o) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
+		sfdisk -A /dev/"$_disk" 1	
 	else
-				(
-sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
-  o # clear the in memory partition table
-  n # new partition
-  p # primary partition
-  1 # partition number 1
-    # default - start at beginning of disk 
-  +200M # 200 MB boot parttion
-  n # new partition
-  p # primary partition
-  2 # partion number 2
-    # default, start immediately after preceding partition
-    # default, extend partition to end of disk
-  a # make a partition bootable
-  1 # bootable partition is partition 1 -- /dev/sda1
-  p # print the in-memory partition table
-  w # write the partition table
-  q # and we're done
-EOF
+				
+				(echo g) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
+
 		fdisk --part-type /dev/"$_disk" 1 EF
-		)
+		
 	fi
-			(
+			
 
 	partprobe /dev/"$_disk" && sleep 1
 	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
@@ -163,7 +129,7 @@ EOF
 		mkdir -p /mnt/boot/efi
 		mount /dev/"$_disk"1 /mnt/boot/efi
 	fi
-	)
+	
 }
 
 check_excludes () {
