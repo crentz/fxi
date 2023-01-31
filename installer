@@ -116,8 +116,10 @@ sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
   p # print the in-memory partition table
   w # write the partition table
   q # and we're done
-EOF
-		sfdisk -A /dev/"$_disk" 1
+EOF 
+sfdisk -A /dev/"$_disk" 1
+)
+		
 	else
 				(
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
@@ -139,6 +141,7 @@ sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
   q # and we're done
 EOF
 		fdisk --part-type /dev/"$_disk" 1 EF
+		)
 	fi
 			(
 
@@ -160,6 +163,7 @@ EOF
 		mkdir -p /mnt/boot/efi
 		mount /dev/"$_disk"1 /mnt/boot/efi
 	fi
+	)
 }
 
 check_excludes () {
