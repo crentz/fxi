@@ -166,7 +166,7 @@ fi
 
 copy_sys () {
 # copy everything over except the things listed in the exclude list
-echo -e "\n Copying system to new partition...\n"
+echo -e "\n Installing Fluxuan to your new partition...\n"
 rsync -axAX / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
 
 # copy the real update-initramfs back in place
@@ -185,6 +185,7 @@ gen_fstab() {
 	genfstab -U /mnt >> /mnt/etc/fstab
 	arch-chroot /mnt fallocate -l 1G /swapfile
 	arch-chroot /mnt mkswap /swapfile
+	arch-chroot /mnt chmod 0600 /swapfile
 	arch-chroot /mnt swapon /swapfile
 	arch-chroot /mnt echo "/swapfile none swap sw 0 0" >> /etc/fstab
 }
@@ -233,7 +234,7 @@ set_wheel() {
 set_default_user() {
 	echo
 	read -r -p "Enter the name of default user: " name
-	arch-chroot /mnt usermod -m "$name" fluxuan
+	arch-chroot /mnt usermod -l "$name" fluxuan
 	arch-chroot /mnt usermod -m -d /home/"$name" "$name"
 	printf '%s\n' "Password for $name (will not echo):"
 	arch-chroot /mnt passwd "$name"
