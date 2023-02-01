@@ -97,7 +97,9 @@ mk_part() {
 	printf '%s\n' "Partitioning /dev/$_disk."
 	umount /dev/"$_disk" && sleep 2
 	sfdisk --delete /dev/"$_disk" && sleep 1
-	partprobe /dev/"$_disk" && sleep 1
+	partx /dev/"$_disk" && sleep 1
+	wipefs -all /dev/"$_disk" && sleep 1
+	partx /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(echo o) | fdisk /dev/"$_disk"
 		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
@@ -112,7 +114,7 @@ mk_part() {
 	fi
 			
 
-	partprobe /dev/"$_disk" && sleep 1
+	partx /dev/"$_disk" && sleep 1
 	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		mkfs.ext4 /dev/"$_disk"1
@@ -261,6 +263,9 @@ setup_grub() {
 
 
 finish() {
+rm $CONF
+rm $rsync_excludes
+rm /mnt/usr/bin/fxw
 	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
 > " re
 	case "$re" in
