@@ -83,7 +83,6 @@ a 1-GB swapfile
 	else
 		d_conf BOOTP "$disk"1
 		d_conf ROOTP "$disk"2
-		ask_part
 	fi
 }
 
