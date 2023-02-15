@@ -3,10 +3,7 @@
 CONF=disk.conf
 rsync_excludes=${rsync_excludes:="/usr/share/fx/installer/exclude.list"}
 error_log=${error_log:="~/installer_error.log"}
-install_dep () {
-apt update && apt install arch-install-scripts -y -qq
 
-}
 welcome_msg () {
 echo
 printf '%s\n' "Welcome to Fluxuan Linux Installer, i hope this installer will be fast and easy to use.
@@ -15,13 +12,14 @@ This installer will guide you to the rest of the setup process.
 
 Thank you for your interest in Fluxuan Linux.
 
-https://fluxuan.org"
+https://Fluxuan.org - https://Forums.Fluxuan.org"
 sleep 5
 }
+
 check_root (){
-[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
+[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root - use sudo!\n" ; exit 1 ; }
 }
-# function to exit the script if there are errors
+
 check_exit () {
 exit_code="$?"
 [[ $exit_code -eq 0 ]] || { echo "
@@ -31,6 +29,7 @@ exit_code="$?"
   "
   exit 1 ; }
 }
+
 error_log () {
 # Record errors in a logfile.
 exec 2>"$error_log"
@@ -52,6 +51,16 @@ d_read() {
 	grep "${_conf}" "$CONF" | cut -d '=' -f2
 }
 
+install_dep () {
+apt update && apt install arch-install-scripts -y -qq
+check_exit
+clear
+}
+
+
+
+# function to exit the script if there are errors
+
 mk_disk() {
 	clear
 	echo
@@ -70,9 +79,15 @@ mk_disk() {
 	The default scheme will be:
 ###################################################################################
 
-a 200mb boot partition on /dev/${disk}1
-a root partition of the remaining space on /dev/${disk}2
-a 1-GB swapfile
+
+
+a 200mb Boot Partition on /dev/${disk}1
+
+a SWAP Partition of your choosing on /dev/${disk}2
+
+a Root Partition of the remaining space on /dev/${disk}3
+
+
 
 ###################################################################################"
 	echo
@@ -82,22 +97,30 @@ a 1-GB swapfile
 		rm "$CONF"
 	else
 		d_conf BOOTP "$disk"1
-		d_conf ROOTP "$disk"2
+		d_conf SWAPS "$disk"2
+		d_conf ROOTP "$disk"3
 	fi
+	check_exit
 }
 
+ask_part() {
+	echo
+	read -r -p "Choose the size of swap in GB (e.g. 2): " swaps
+	d_conf SWAPS "$swaps"
+}
 
 # Partitioning disk and running mkfs.
 mk_part() {
-	local _disk _mode _roots
+	local _disk _mode _swaps _roots
 	_disk=$(d_read DISK)
 	_mode=$(d_read MODE)
+	_swaps=$(d_read SWAPS)
+	
 	echo
 	printf '%s\n' "Partitioning /dev/$_disk."
 	umount /dev/"$_disk" && sleep 2
+	dd bs=512 count=50 if=/dev/zero of=/dev/"$_disk" && sleep 2
 	sfdisk --delete /dev/"$_disk" && sleep 1
-	partx /dev/"$_disk" && sleep 1
-	wipefs -all /dev/"$_disk" && sleep 1
 	partx /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(echo o) | fdisk /dev/"$_disk"
@@ -107,12 +130,12 @@ mk_part() {
 				
 				(echo g) | fdisk /dev/"$_disk"
 		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
-
 		fdisk --part-type /dev/"$_disk" 1 EF
 		
-	fi
-			
-
+	fi		
+	(echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo w) | fdisk /dev/"$_disk"
+	sfdisk --part-type /dev/"$_disk" 2 82
+	(echo n; echo p; echo 3; echo ; echo ; echo w) | fdisk /dev/"$_disk"
 	partx /dev/"$_disk" && sleep 1
 	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
@@ -120,10 +143,11 @@ mk_part() {
 	else
 		mkfs.fat -F 32 /dev/"$_disk"1
 	fi
-	mkfs.ext4 /dev/"$_disk"2
-
+	mkswap /dev/"$_disk"2
+	swapon /dev/"$_disk"2
+	mkfs.ext4 /dev/"$_disk"3
 	printf '%s\n' "Mounting Partitions" && sleep 1
-	mount /dev/"$_disk"2 /mnt
+	mount /dev/"$_disk"3 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
 		mount /dev/"$_disk"1 /mnt/boot
@@ -131,7 +155,8 @@ mk_part() {
 		mkdir -p /mnt/boot/efi
 		mount /dev/"$_disk"1 /mnt/boot/efi
 	fi
-	
+	check_exit
+	clear
 }
 
 check_excludes () {
@@ -159,6 +184,8 @@ if ! [[ -f  $rsync_excludes ]] ; then
 - /etc/mtab
 - /home/snapshot
 - /home/*/.gvfs
+- /usr/bin/fxw
+- /usr/share/fx/installer
 EOF
 check_exit
 chmod 666 "$rsync_excludes"
@@ -168,7 +195,7 @@ fi
 copy_sys () {
 # copy everything over except the things listed in the exclude list
 echo -e "\n Installing Fluxuan to your new partition...\n"
-rsync -axAX / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
+rsync -aAXv / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
 
 # copy the real update-initramfs back in place
 echo -e "\n Copying update-initramfs...\n"
@@ -178,29 +205,35 @@ fi
 if [[ -f /mnt/usr/sbin/update-initramfs.debian ]] ; then
     cp /mnt/usr/sbin/update-initramfs.debian /mnt/usr/sbin/update-initramfs
 fi
+check_exit
+clear
 }
 
 gen_fstab() {
 	echo
 	printf '%s\n' "Generating fstab..." && sleep 1
 	genfstab -U /mnt >> /mnt/etc/fstab
-	arch-chroot /mnt fallocate -l 1G /swapfile
-	arch-chroot /mnt mkswap /swapfile
-	arch-chroot /mnt chmod 0600 /swapfile
-	arch-chroot /mnt swapon /swapfile
-	arch-chroot /mnt echo "/swapfile none swap sw 0 0" >> /etc/fstab
+	check_exit
 }
 
 timezone() {
 	echo
 	printf '%s\n' "Setting timezone..." && sleep 1
 	arch-chroot /mnt dpkg-reconfigure tzdata
+	check_exit
+}
+
+locales() {
+	sleep 1 && echo
+	printf "Setting locale..." && sleep 1
+	arch-chroot /mnt dpkg-reconfigure locales
+	check_exit
 }
 
 set_hostname() {
 	echo
 	read -r -p "Hostname for this machine: " hostname
-	echo "$hostname" > /mnt/etc/hosts
+	echo "$hostname" > /mnt/etc/hostname
 	cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
 127.0.1.1	$hostname
@@ -209,12 +242,7 @@ set_hostname() {
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-}
-
-locales() {
-	sleep 1 && echo
-	printf "Setting locale..." && sleep 1
-	arch-chroot /mnt dpkg-reconfigure locales
+check_exit
 }
 
 set_pass() {
@@ -222,14 +250,6 @@ set_pass() {
 	printf '%s\n' "Enter password for the root account (will not echo)"
 	arch-chroot /mnt passwd root
 	printf '%s\n' "Root password set. You may wish to disable the root account with passwd -l later on."
-}
-
-set_wheel() {
-	echo
-	printf '%s\n' "Setting up wheel group" && sleep 1
-	sed -i '15 s/^# //' /mnt/etc/pam.d/su
-	arch-chroot /mnt addgroup --system wheel
-	echo "permit :wheel" > /mnt/etc/doas.conf
 }
 
 set_default_user() {
@@ -241,6 +261,7 @@ set_default_user() {
 	arch-chroot /mnt passwd "$name"
 	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
 	arch-chroot /mnt usermod -s /bin/bash "$name"
+	check_exit
 }
 
 
@@ -258,13 +279,13 @@ setup_grub() {
 		arch-chroot /mnt grub-install /dev/"$_disk"
 		arch-chroot /mnt update-grub
 	fi
+	check_exit
 }
 
 
 finish() {
-rm $CONF
-rm $rsync_excludes
-rm /mnt/usr/bin/fxw
+rm "$CONF"
+rm "$rsync_excludes"
 	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
 > " re
 	case "$re" in
@@ -279,15 +300,15 @@ do_install() {
 	welcome_msg
 	install_dep
 	mk_disk
+	ask_part
 	mk_part
 	check_excludes
 	copy_sys
 	gen_fstab
 	timezone
-	set_hostname
 	locale
+	set_hostname
 	set_pass
-	set_wheel
 	set_default_user
 	setup_grub
 	finish
