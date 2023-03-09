@@ -1,42 +1,12 @@
 #!/bin/bash
 
-CONF=disk.conf
-rsync_excludes=${rsync_excludes:="/usr/share/fx/installer/exclude.list"}
-error_log=${error_log:="~/installer_error.log"}
-
-welcome_msg () {
-echo
-printf '%s\n' "Welcome to Fluxuan Linux Installer, i hope this installer will be fast and easy to use.
-
-This installer will guide you to the rest of the setup process.
-
-Thank you for your interest in Fluxuan Linux.
-
-https://Fluxuan.org - https://Forums.Fluxuan.org"
-sleep 5
-}
+home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+rsync_excludes=${rsync_excludes:="$home/.config/f_iexclude.list"}
+CONF=${disk_conf:="$home/.config/f_i.txt"}
 
 check_root (){
-[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root - use sudo!\n" ; exit 1 ; }
-}
-
-check_exit () {
-exit_code="$?"
-[[ $exit_code -eq 0 ]] || { echo "
-  
-  Exit due to error:  $exit_code
-  See $error_log for details.
-  "
-  exit 1 ; }
-}
-
-error_log () {
-# Record errors in a logfile.
-exec 2>"$error_log"
-
-if [[ $DEBUG = "yes" ]] ; then
-	set -x
-fi
+# check if running as root
+[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
 }
 
 # writing to disk.conf
@@ -51,93 +21,110 @@ d_read() {
 	grep "${_conf}" "$CONF" | cut -d '=' -f2
 }
 
-install_dep () {
-apt update && apt install arch-install-scripts -y -qq
-check_exit
-clear
+welcome_msg () {
+
+whiptail --title "Fluxuan-Installer" --msgbox "Welcome to Fluxuan-Installer utility.
+This installer will guide you to the rest of the setup process.
+
+Thank you for your interest in Fluxuan Linux.
+
+https://Fluxuan.org - https://Forums.Fluxuan.org" 15 65
+
 }
 
+ask_part () {
 
+disk=$(whiptail --inputbox "Your available devices are :
 
-# function to exit the script if there are errors
+$(lsblk -lp | awk '/disk/ { print $1, "(" $4 ")" }' | cut -d '/' -f3)
+##########################################################
+Which disk should the system be installed on? (e.g. sdX):" 15 65 sdX --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
 
-mk_disk() {
-	clear
-	echo
-	printf '%s\n' "Disk partitioning. 
-	Your available devices are: "
-	echo
-	lsblk -lp | awk '/disk/ { print $1, "(" $4 ")" }' | cut -d '/' -f3
-	echo
-	read -r -p "Which disk should the system be installed on? (e.g. sdX): " disk
-	d_conf DISK "$disk"
-	echo
-	read -r -p "Will you boot in bios or EFI mode (-- write bios or EFI --)? " mode
-	d_conf MODE "$mode"
-	echo
-	printf '%s\n' "Custom partitioning schemes are not yet supported.
-	The default scheme will be:
-###################################################################################
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf DISK "$disk"
+else
+    exit 1 ;
+fi
 
 
 
-a 200mb Boot Partition on /dev/${disk}1
+mode=$(whiptail --inputbox "Will you boot in bios or EFI mode (-- write bios or EFI --)?" 15 65 bios --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
 
-a SWAP Partition of your choosing on /dev/${disk}2
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf MODE "$mode"
+else
+    exit 1 ;
+fi
 
-a Root Partition of the remaining space on /dev/${disk}3
 
 
+whiptail --title "Fluxuan-Installer" --msgbox "Custom partitioning schemes are not yet supported.
+The default scheme will be:
 
-###################################################################################"
-	echo
-	read -r -p "Proceed? (all data on $disk will be deleted, so make sure you backed up anything important) (Y/n): " yesno
-	if [ "$yesno" == "no" ]; then
-		printf '%s\n' "Exiting script... Start again."
-		rm "$CONF"
-	else
-		d_conf BOOTP "$disk"1
-		d_conf SWAPS "$disk"2
+1-> 200mb Boot Partition on /dev/${disk}1
+
+2-> SWAP Partition of your choosing on /dev/${disk}2
+
+3-> Root Partition of the remaining space on /dev/${disk}3" 15 65 ;
+
+if (whiptail --title "Fluxuan-Installer" --yesno "Proceed? (all data on $disk will be deleted, so make sure you backed up anything important)." 8 78); then
+    	d_conf BOOTP "$disk"1
+		d_conf SWAPP "$disk"2
 		d_conf ROOTP "$disk"3
-	fi
-	check_exit
+		mk_part
+else
+    exit 1 ;
+fi
+
+swaps=$(whiptail --inputbox "Choose the size of swap in GB (e.g. 2):" 8 78 2 --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
+
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf SWAPS "$swaps"
+else
+    exit 1 ;
+fi
+
 }
 
-ask_part() {
-	echo
-	read -r -p "Choose the size of swap in GB (e.g. 2): " swaps
-	d_conf SWAPS "$swaps"
-}
-
-# Partitioning disk and running mkfs.
 mk_part() {
-	local _disk _mode _swaps _roots
+{
+	local _disk _mode _swaps
 	_disk=$(d_read DISK)
 	_mode=$(d_read MODE)
 	_swaps=$(d_read SWAPS)
 	
-	echo
-	printf '%s\n' "Partitioning /dev/$_disk."
-	umount /dev/"$_disk" && sleep 2
-	dd bs=512 count=50 if=/dev/zero of=/dev/"$_disk" && sleep 2
-	sfdisk --delete /dev/"$_disk" && sleep 1
+	umount /dev/"$_disk"
+	sfdisk --delete /dev/"$_disk"
+	parted /dev/"$_disk" --script mklabel msdos
 	partx /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(echo o) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w) | fdisk /dev/"$_disk"
 		sfdisk -A /dev/"$_disk" 1	
 	else
 				
 				(echo g) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w; echo q) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w) | fdisk /dev/"$_disk"
 		fdisk --part-type /dev/"$_disk" 1 EF
 		
-	fi		
-	(echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo w) | fdisk /dev/"$_disk"
+	fi	
+		
+	(echo n; echo p; echo 2; echo; echo +"$_swaps"G; echo w; echo q) | fdisk /dev/"$_disk"
 	sfdisk --part-type /dev/"$_disk" 2 82
-	(echo n; echo p; echo 3; echo ; echo ; echo w) | fdisk /dev/"$_disk"
+	(echo n; echo p; echo 3; echo; echo; echo w; echo q) | fdisk /dev/"$_disk"
 	partx /dev/"$_disk" && sleep 1
-	printf '%s\n' "Creating Partitions on /dev/$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		mkfs.ext4 /dev/"$_disk"1
 	else
@@ -146,7 +133,6 @@ mk_part() {
 	mkswap /dev/"$_disk"2
 	swapon /dev/"$_disk"2
 	mkfs.ext4 /dev/"$_disk"3
-	printf '%s\n' "Mounting Partitions" && sleep 1
 	mount /dev/"$_disk"3 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
@@ -155,13 +141,17 @@ mk_part() {
 		mkdir -p /mnt/boot/efi
 		mount /dev/"$_disk"1 /mnt/boot/efi
 	fi
-	check_exit
-	clear
+for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+
+} | whiptail --gauge "Creating Partitions on your disk" 6 60 0
 }
 
 check_excludes () {
 if ! [[ -f  $rsync_excludes ]] ; then
-    rsync_excludes="$(pwd)/exclude.list"
+    rsync_excludes="$home/.config/f_iexclude.list"
     sleep 2
     cat > "$rsync_excludes" <<EOF
 # It is safe to delete this file after installation.
@@ -186,54 +176,61 @@ if ! [[ -f  $rsync_excludes ]] ; then
 - /home/*/.gvfs
 - /usr/bin/fxw
 - /usr/share/fx/installer
+- /usr/bin/welcome
 EOF
-check_exit
 chmod 666 "$rsync_excludes"
 fi 
 }
 
 copy_sys () {
-# copy everything over except the things listed in the exclude list
-echo -e "\n Installing Fluxuan to your new partition...\n"
+{
 rsync -aAXv / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
-
-# copy the real update-initramfs back in place
-echo -e "\n Copying update-initramfs...\n"
 if [[ -f /mnt/usr/sbin/update-initramfs.distrib ]] ; then
     cp /mnt/usr/sbin/update-initramfs.distrib /mnt/usr/sbin/update-initramfs
 fi
 if [[ -f /mnt/usr/sbin/update-initramfs.debian ]] ; then
     cp /mnt/usr/sbin/update-initramfs.debian /mnt/usr/sbin/update-initramfs
 fi
-check_exit
-clear
-}
 
-gen_fstab() {
-	echo
-	printf '%s\n' "Generating fstab..." && sleep 1
-	genfstab -U /mnt >> /mnt/etc/fstab
-	check_exit
+genfstab -U /mnt >> /mnt/etc/fstab &
+
+for ((i=0; i<=100; i+=1)); do
+        proc=$(ps aux | grep -v grep | grep -e "rsync")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 10
+            echo "$i"
+           
+        i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+
+} | whiptail --gauge "Installing Operating System" 6 60 0
 }
 
 timezone() {
-	echo
-	printf '%s\n' "Setting timezone..." && sleep 1
 	arch-chroot /mnt dpkg-reconfigure tzdata
-	check_exit
 }
 
 locales() {
-	sleep 1 && echo
-	printf "Setting locale..." && sleep 1
+	sleep 1 &&
 	arch-chroot /mnt dpkg-reconfigure locales
-	check_exit
 }
 
 set_hostname() {
-	echo
-	read -r -p "Hostname for this machine: " hostname
-	echo "$hostname" > /mnt/etc/hostname
+hostname=$(whiptail --inputbox "Input your desired hostname" 8 78 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
+
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf HOSTNAME "$hostname"
+    echo "$hostname" > /mnt/etc/hostname
 	cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
 127.0.1.1	$hostname
@@ -242,33 +239,62 @@ set_hostname() {
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-check_exit
+set_pass
+else
+    rm "$CONF" &&
+    exit ;
+fi
 }
 
 set_pass() {
-	echo
-	printf '%s\n' "Enter password for the root account (will not echo)"
-	arch-chroot /mnt passwd root
-	printf '%s\n' "Root password set. You may wish to disable the root account with passwd -l later on."
+PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your ROOT Password." 10 60 3>&1 1>&2 2>&3)
+
+exitstatus=$?
+
+if [ $exitstatus = 0 ]; then
+	echo -e "$PASSWD\n$PASSWD" | passwd
+else
+	rm "$CONF" &&
+	exit ;
+fi
 }
 
 set_default_user() {
-	echo
-	read -r -p "Enter the name of default user: " name
-	arch-chroot /mnt usermod -l "$name" fluxuan
+local _name
+	_name=$(d_read NAME)
+	
+name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
+
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+	d_conf NAME "$name"
+    arch-chroot /mnt usermod -l "$name" fluxuan
 	arch-chroot /mnt usermod -m -d /home/"$name" "$name"
-	printf '%s\n' "Password for $name (will not echo):"
-	arch-chroot /mnt passwd "$name"
-	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
-	arch-chroot /mnt usermod -s /bin/bash "$name"
-	check_exit
+else
+    exit 1 ;
+fi
+
+PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your USER Password." 10 60 3>&1 1>&2 2>&3)
+
+exitstatus=$?
+
+if [ $exitstatus = 0 ]; then
+	echo -e "$PASSWD\n$PASSWD" | passwd "$_name"
+	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
+	arch-chroot /mnt usermod -s /bin/bash "$_name"
+else
+	exit 1 ;
+fi
+
 }
 
 
 setup_grub() {
+{
 	local _mode _disk
-	echo
-	printf '%s\n' "seting up the GRUB bootloader..."
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
 	if [ "$_mode" == "bios" ]; then
@@ -279,32 +305,31 @@ setup_grub() {
 		arch-chroot /mnt grub-install /dev/"$_disk"
 		arch-chroot /mnt update-grub
 	fi
-	check_exit
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Installing Grub on your disk." 6 60 0
 }
 
-
 finish() {
-rm "$CONF"
-rm "$rsync_excludes"
-	read -r -p "Installation finished. R to reboot, E to exit and continue in the live environment.
-> " re
-	case "$re" in
-		R) reboot ;;
-		E) exit ;;
-		*) ;;
-	esac
+	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan Has been installed on your System. Would you like to reboot?" 8 78); then
+	rm "$CONF" &&
+	rm "$rsync_excludes" &&
+    reboot
+	else
+    rm "$CONF" &&
+    rm "$rsync_excludes" &&
+    exit 0 ;
+	fi
 }
 
 do_install() {
-	printf '%s\n' "Launching the installer..."
 	welcome_msg
-	install_dep
-	mk_disk
 	ask_part
 	mk_part
 	check_excludes
 	copy_sys
-	gen_fstab
 	timezone
 	locale
 	set_hostname
