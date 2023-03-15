@@ -1,12 +1,26 @@
 #!/bin/bash
 
-home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-rsync_excludes=${rsync_excludes:="$home/.config/f_iexclude.list"}
-CONF=${disk_conf:="$home/.config/f_i.txt"}
+#       @(#)Copyright (c) 1991 Simon J. Gerraty
+#
+#       This file is provided in the hope that it will
+#       be of use.  There is absolutely NO WARRANTY.
+#       Permission to copy, redistribute or otherwise
+#       use this file is hereby granted provided that
+#       the above copyright notice and this notice are
+#       left intact.
+#
+#		Fluxuan Linux Snapshot Tool
+#	
+#		https://fluxuan.org - https://forums.fluxuan.org
+#		Thank you for your interest in Fluxuan Linux !!
+
+
+rsync_excludes=${rsync_excludes:="/tmp/exclude.list"}
+CONF=${disk_conf:="/tmp/disk.txt"}
 
 check_root (){
 # check if running as root
-[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
+[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root so use SUDO !\n" ; exit 1 ; }
 }
 
 # writing to disk.conf
@@ -105,18 +119,17 @@ mk_part() {
 	_mode=$(d_read MODE)
 	_swaps=$(d_read SWAPS)
 	
-	umount /dev/"$_disk"
-	sfdisk --delete /dev/"$_disk"
-	parted /dev/"$_disk" --script mklabel msdos
+	ls /dev/"$_disk"?* | xargs -n1 umount -l
+	parted --script /dev/"$_disk" mklabel msdos
 	partx /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
 		(echo o) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo w; echo q) | fdisk /dev/"$_disk"
 		sfdisk -A /dev/"$_disk" 1	
 	else
 				
 				(echo g) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo n; echo p; echo 2; echo ; echo ; echo a; echo 1; echo p; echo w) | fdisk /dev/"$_disk"
+		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo w; echo q) | fdisk /dev/"$_disk"
 		fdisk --part-type /dev/"$_disk" 1 EF
 		
 	fi	
@@ -151,7 +164,7 @@ for ((i=0; i<=100; i+=1)); do
 
 check_excludes () {
 if ! [[ -f  $rsync_excludes ]] ; then
-    rsync_excludes="$home/.config/f_iexclude.list"
+    rsync_excludes="/tmp/exclude.list"
     sleep 2
     cat > "$rsync_excludes" <<EOF
 # It is safe to delete this file after installation.
@@ -217,7 +230,6 @@ timezone() {
 }
 
 locales() {
-	sleep 1 &&
 	arch-chroot /mnt dpkg-reconfigure locales
 }
 
@@ -239,10 +251,9 @@ if [ $exitstatus = 0 ]; then
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-set_pass
 else
-    rm "$CONF" &&
-    exit ;
+    rm "$CONF" ;
+    exit 1 ;
 fi
 }
 
@@ -254,8 +265,8 @@ exitstatus=$?
 if [ $exitstatus = 0 ]; then
 	echo -e "$PASSWD\n$PASSWD" | passwd
 else
-	rm "$CONF" &&
-	exit ;
+	rm "$CONF" ;
+	exit 1 ;
 fi
 }
 
@@ -274,6 +285,7 @@ if [ $exitstatus = 0 ]; then
     arch-chroot /mnt usermod -l "$name" fluxuan
 	arch-chroot /mnt usermod -m -d /home/"$name" "$name"
 else
+rm "$CONF" ;
     exit 1 ;
 fi
 
@@ -309,17 +321,17 @@ setup_grub() {
         sleep 0.1
         echo "$i"
     done
-} | whiptail --gauge "Installing Grub on your disk." 6 60 0
+} | whiptail --gauge "Installing Grub please wait..." 6 60 0
 }
 
 finish() {
-	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan Has been installed on your System. Would you like to reboot?" 8 78); then
-	rm "$CONF" &&
-	rm "$rsync_excludes" &&
+	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. Would you like to reboot or continue using live disk?" 8 78); then
+	rm "$CONF" ;
+	rm "$rsync_excludes" ;
     reboot
 	else
-    rm "$CONF" &&
-    rm "$rsync_excludes" &&
+    rm "$CONF" ;
+    rm "$rsync_excludes" ;
     exit 0 ;
 	fi
 }
