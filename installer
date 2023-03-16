@@ -9,7 +9,7 @@
 #       the above copyright notice and this notice are
 #       left intact.
 #
-#		Fluxuan Linux Snapshot Tool
+#		Fluxuan Linux Installer
 #	
 #		https://fluxuan.org - https://forums.fluxuan.org
 #		Thank you for your interest in Fluxuan Linux !!
@@ -120,31 +120,32 @@ mk_part() {
 	_swaps=$(d_read SWAPS)
 	
 	 ls /dev/"$_disk"?* | xargs -n1 umount -l
-	 parted --script /dev/"$_disk" mklabel msdos
+	 parted -s /dev/"$_disk" mklabel msdos
 	if [ "$_mode" == "bios" ]; then
-		(echo o) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo n; echo p; echo 3; echo ; echo ; echo w; echo q) | fdisk /dev/"$_disk" &&
-		sfdisk -A /dev/"$_disk" 1 &&
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s -a optimal /dev/"$_disk" mkpart primary 1MiB 200MiB
+		parted -s -a optimal /dev/"$_disk" mkpart primary 200MiB "$_swaps"GB
+		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
+		parted -s /dev/"$_disk" set 1 boot on 
 		sfdisk --part-type /dev/"$_disk" 2 82 
 	else
-				
-				(echo g) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo n; echo p; echo 3; echo ; echo ; echo w; echo q) | fdisk /dev/"$_disk" &&
-		fdisk --part-type /dev/"$_disk" 1 EF &&
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s -a optimal /dev/"$_disk" mkpart primary 1MiB 200MiB
+		parted -s -a optimal /dev/"$_disk" mkpart primary 200MiB "$_swaps"GB
+		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
+		parted -s /dev/"$_disk" set 1 ESP on
 		sfdisk --part-type /dev/"$_disk" 2 82
 		
 	fi	
-	
-	partx -u /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
-		mkfs.ext4 /dev/"$_disk"1 &&
-		mkswap /dev/"$_disk"2 &&
-		swapon /dev/"$_disk"2 &&
+		mkfs.ext4 /dev/"$_disk"1
+		mkswap /dev/"$_disk"2
+		swapon /dev/"$_disk"2
 		mkfs.ext4 /dev/"$_disk"3
 	else
-		mkfs.fat -F 32 /dev/"$_disk"1 &&
-		mkswap /dev/"$_disk"2 &&
-		swapon /dev/"$_disk"2 &&
+		mkfs.fat -F 32 /dev/"$_disk"1
+		mkswap /dev/"$_disk"2
+		swapon /dev/"$_disk"2
 		mkfs.ext4 /dev/"$_disk"3
 	fi
 	partx -u /dev/"$_disk"
@@ -199,7 +200,7 @@ fi
 
 copy_sys () {
 {
-rsync -aAXv / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded --info=progress2
+rsync -av / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded
 if [[ -f /mnt/usr/sbin/update-initramfs.distrib ]] ; then
     cp /mnt/usr/sbin/update-initramfs.distrib /mnt/usr/sbin/update-initramfs
 fi
@@ -214,7 +215,7 @@ for ((i=0; i<=100; i+=1)); do
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
-            sleep 10
+            sleep 4
             echo "$i"
            
         i=$(expr $i + 1)
