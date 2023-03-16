@@ -78,7 +78,17 @@ else
     exit 1 ;
 fi
 
+swaps=$(whiptail --inputbox "Choose the size of swap in GB (e.g. 2):" 8 78 2 --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
+# Meaning instead of return the error code, it returns the value entered
 
+# Now to check if the user pressed OK or Cancel
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf SWAPS "$swaps"
+else
+    exit 1 ;
+fi
 
 whiptail --title "Fluxuan-Installer" --msgbox "Custom partitioning schemes are not yet supported.
 The default scheme will be:
@@ -98,17 +108,7 @@ else
     exit 1 ;
 fi
 
-swaps=$(whiptail --inputbox "Choose the size of swap in GB (e.g. 2):" 8 78 2 --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
-# Meaning instead of return the error code, it returns the value entered
 
-# Now to check if the user pressed OK or Cancel
-exitstatus=$?
-if [ $exitstatus = 0 ]; then
-    d_conf SWAPS "$swaps"
-else
-    exit 1 ;
-fi
 
 }
 
@@ -119,33 +119,35 @@ mk_part() {
 	_mode=$(d_read MODE)
 	_swaps=$(d_read SWAPS)
 	
-	ls /dev/"$_disk"?* | xargs -n1 umount -l
-	parted --script /dev/"$_disk" mklabel msdos
-	partx /dev/"$_disk" && sleep 1
+	 ls /dev/"$_disk"?* | xargs -n1 umount -l
+	 parted --script /dev/"$_disk" mklabel msdos
 	if [ "$_mode" == "bios" ]; then
 		(echo o) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo w; echo q) | fdisk /dev/"$_disk"
-		sfdisk -A /dev/"$_disk" 1	
+		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo n; echo p; echo 3; echo ; echo ; echo w; echo q) | fdisk /dev/"$_disk" &&
+		sfdisk -A /dev/"$_disk" 1 &&
+		sfdisk --part-type /dev/"$_disk" 2 82 
 	else
 				
 				(echo g) | fdisk /dev/"$_disk"
-		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo w; echo q) | fdisk /dev/"$_disk"
-		fdisk --part-type /dev/"$_disk" 1 EF
+		(echo n; echo p; echo 1; echo ; echo +200M; echo a; echo 1; echo n; echo p; echo 2; echo ; echo +"$_swaps"G; echo n; echo p; echo 3; echo ; echo ; echo w; echo q) | fdisk /dev/"$_disk" &&
+		fdisk --part-type /dev/"$_disk" 1 EF &&
+		sfdisk --part-type /dev/"$_disk" 2 82
 		
 	fi	
-		
-	(echo n; echo p; echo 2; echo; echo +"$_swaps"G; echo w; echo q) | fdisk /dev/"$_disk"
-	sfdisk --part-type /dev/"$_disk" 2 82
-	(echo n; echo p; echo 3; echo; echo; echo w; echo q) | fdisk /dev/"$_disk"
-	partx /dev/"$_disk" && sleep 1
+	
+	partx -u /dev/"$_disk" && sleep 1
 	if [ "$_mode" == "bios" ]; then
-		mkfs.ext4 /dev/"$_disk"1
+		mkfs.ext4 /dev/"$_disk"1 &&
+		mkswap /dev/"$_disk"2 &&
+		swapon /dev/"$_disk"2 &&
+		mkfs.ext4 /dev/"$_disk"3
 	else
-		mkfs.fat -F 32 /dev/"$_disk"1
+		mkfs.fat -F 32 /dev/"$_disk"1 &&
+		mkswap /dev/"$_disk"2 &&
+		swapon /dev/"$_disk"2 &&
+		mkfs.ext4 /dev/"$_disk"3
 	fi
-	mkswap /dev/"$_disk"2
-	swapon /dev/"$_disk"2
-	mkfs.ext4 /dev/"$_disk"3
+	partx -u /dev/"$_disk"
 	mount /dev/"$_disk"3 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
