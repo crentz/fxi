@@ -15,22 +15,41 @@
 #		Thank you for your interest in Fluxuan Linux !!
 
 
-rsync_excludes=${rsync_excludes:="/tmp/exclude.list"}
 CONF=${disk_conf:="/tmp/disk.txt"}
 
-check_root (){
+check_root () {
 # check if running as root
 [[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root so use SUDO !\n" ; exit 1 ; }
 }
 
+install_dep () {
+{
+apt-get update && apt-get install arch-install-scripts -y -qq
+for ((i=0; i<=100; i+=1)); do
+        proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo "$i"
+           
+        i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Installing Dependencies..." 6 60 0
+}
+
 # writing to disk.conf
-d_conf() {
+d_conf () {
 	local _conf=$1 _value=$2
 	printf '%s\n' "${_conf}=${_value}" >> "$CONF"
 }
 
 # Parsing values from disk.conf
-d_read() {
+d_read () {
 	local _conf=$1
 	grep "${_conf}" "$CONF" | cut -d '=' -f2
 }
@@ -119,36 +138,30 @@ mk_part() {
 	_mode=$(d_read MODE)
 	_swaps=$(d_read SWAPS)
 	
-	 ls /dev/"$_disk"?* | xargs -n1 umount -l
-	 parted -s /dev/"$_disk" mklabel msdos
+	parted -s /dev/"$_disk" mklabel msdos
 	if [ "$_mode" == "bios" ]; then
-		parted -s /dev/"$_disk" mklabel msdos
 		parted -s -a optimal /dev/"$_disk" mkpart primary 1MiB 200MiB
 		parted -s -a optimal /dev/"$_disk" mkpart primary 200MiB "$_swaps"GB
 		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
 		parted -s /dev/"$_disk" set 1 boot on 
-		sfdisk --part-type /dev/"$_disk" 2 82 
 	else
 		parted -s /dev/"$_disk" mklabel msdos
 		parted -s -a optimal /dev/"$_disk" mkpart primary 1MiB 200MiB
 		parted -s -a optimal /dev/"$_disk" mkpart primary 200MiB "$_swaps"GB
 		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
 		parted -s /dev/"$_disk" set 1 ESP on
-		sfdisk --part-type /dev/"$_disk" 2 82
 		
 	fi	
+		sfdisk --part-type /dev/"$_disk" 2 82
+		mkswap /dev/"$_disk"2
+		swapon /dev/"$_disk"2
+		mkfs.ext4 /dev/"$_disk"3
 	if [ "$_mode" == "bios" ]; then
 		mkfs.ext4 /dev/"$_disk"1
-		mkswap /dev/"$_disk"2
-		swapon /dev/"$_disk"2
-		mkfs.ext4 /dev/"$_disk"3
+		
 	else
 		mkfs.fat -F 32 /dev/"$_disk"1
-		mkswap /dev/"$_disk"2
-		swapon /dev/"$_disk"2
-		mkfs.ext4 /dev/"$_disk"3
 	fi
-	partx -u /dev/"$_disk"
 	mount /dev/"$_disk"3 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
@@ -165,42 +178,9 @@ for ((i=0; i<=100; i+=1)); do
 } | whiptail --gauge "Creating Partitions on your disk" 6 60 0
 }
 
-check_excludes () {
-if ! [[ -f  $rsync_excludes ]] ; then
-    rsync_excludes="/tmp/exclude.list"
-    sleep 2
-    cat > "$rsync_excludes" <<EOF
-# It is safe to delete this file after installation.
-- /dev/*
-- /cdrom/*
-- /media/*
-- /target
-- /swapfile
-- /mnt/*
-- /sys/*
-- /proc/*
-- /tmp/*
-- /live
-- /boot/grub/grub.cfg
-- /boot/grub/menu.lst
-- /boot/grub/device.map
-- /etc/udev/rules.d/70-persistent-cd.rules
-- /etc/udev/rules.d/70-persistent-net.rules
-- /etc/fstab
-- /etc/mtab
-- /home/snapshot
-- /home/*/.gvfs
-- /usr/bin/fxw
-- /usr/share/fx/installer
-- /usr/bin/welcome
-EOF
-chmod 666 "$rsync_excludes"
-fi 
-}
-
 copy_sys () {
 {
-rsync -av / /mnt/ --filter='P lost+found' --filter='H lost+found' --exclude-from="$rsync_excludes" --delete-excluded
+rsync -axHAWXS --numeric-ids --info=progress2 / /mnt/
 if [[ -f /mnt/usr/sbin/update-initramfs.distrib ]] ; then
     cp /mnt/usr/sbin/update-initramfs.distrib /mnt/usr/sbin/update-initramfs
 fi
@@ -215,7 +195,7 @@ for ((i=0; i<=100; i+=1)); do
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
-            sleep 4
+            sleep 1
             echo "$i"
            
         i=$(expr $i + 1)
@@ -224,7 +204,6 @@ for ((i=0; i<=100; i+=1)); do
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-
 } | whiptail --gauge "Installing Operating System" 6 60 0
 }
 
@@ -328,7 +307,7 @@ setup_grub() {
 }
 
 finish() {
-	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. Would you like to reboot or continue using live disk?" 8 78); then
+	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
 	rm "$rsync_excludes" ;
     reboot
@@ -341,9 +320,9 @@ finish() {
 
 do_install() {
 	welcome_msg
+	install_dep
 	ask_part
 	mk_part
-	check_excludes
 	copy_sys
 	timezone
 	locale
