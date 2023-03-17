@@ -245,7 +245,7 @@ set_pass() {
 PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your ROOT Password." 10 60 3>&1 1>&2 2>&3)
 PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 60 3>&1 1>&2 2>&3)
 
-if [["PASSWD" == "PASSWD_CHECK" ]]; then
+if [["$PASSWD" == "$PASSWD_CHECK" ]]; then
 	echo -e "$PASSWD\n$PASSWD" | passwd
 else
 	rm "$CONF" ;
@@ -276,7 +276,7 @@ fi
 PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your USER Password." 10 60 3>&1 1>&2 2>&3)
 PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password " 10 60 3>&1 1>&2 2>&3)
 
-if [["PASSWD_USER" == "PASSWD_CHECK_USER" ]]; then
+if [["$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
 	echo -e "$PASSWD\n$PASSWD" | passwd "$_name"
 	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
 	arch-chroot /mnt usermod -s /bin/bash "$_name"
