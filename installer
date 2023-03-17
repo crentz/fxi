@@ -140,18 +140,19 @@ mk_part() {
 	
 	if [ "$_mode" == "bios" ]; then
 		parted -s /dev/"$_disk" mklabel msdos
-		parted -s -a optimal /dev/"$_disk" mkpart primary 1 200
-		parted -s -a optimal /dev/"$_disk" mkpart primary 200 "$_swaps"GB
-		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
+		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 1MiB 200MiB
+		parted -s -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
+		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
 		parted -s /dev/"$_disk" set 1 boot on 
 	else
 		parted -s /dev/"$_disk" mklabel msdos
-		parted -s -a optimal /dev/"$_disk" mkpart primary 1 200
-		parted -s -a optimal /dev/"$_disk" mkpart primary 200 "$_swaps"GB
-		parted -s -a optimal /dev/"$_disk" mkpart primary "$_swaps"GB 100%
+		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 1MiB 200MiB
+		parted -s -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
+		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
 		parted -s /dev/"$_disk" set 1 ESP on
 		
 	fi	
+		parted -s /dev/"$_disk" set 2 swap on 
 		partx -u /dev/"$_disk"
 		mkfs.ext4 /dev/"$_disk"3
 		mkswap /dev/"$_disk"2
@@ -173,8 +174,9 @@ for ((i=0; i<=100; i+=1)); do
 
 copy_sys () {
 {
-local  _mode
+local  _mode _disk
 	_mode=$(d_read MODE)
+	_disk=$(d_read DISK)
 	mount /dev/"$_disk"3 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
