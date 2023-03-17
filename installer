@@ -140,13 +140,13 @@ mk_part() {
 	
 	if [ "$_mode" == "bios" ]; then
 		parted --script /dev/"$_disk" mklabel msdos
-		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 1 200MiB
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 0% 200MiB
 		parted --script -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
 		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
 		parted --script /dev/"$_disk" set 1 boot on 
 	else
 		parted --script /dev/"$_disk" mklabel msdos
-		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 1 200MiB
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 0% 200MiB
 		parted --script -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
 		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
 		parted --script /dev/"$_disk" set 1 ESP on
