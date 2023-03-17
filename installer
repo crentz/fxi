@@ -70,7 +70,7 @@ ask_part () {
 disk=$(whiptail --inputbox "Your available devices are :
 
 $(lsblk -lp | awk '/disk/ { print $1, "(" $4 ")" }' | cut -d '/' -f3)
-##########################################################
+----------------------------------------------------------
 Which disk should the system be installed on? (e.g. sdX):" 15 65 sdX --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 # The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
 # Meaning instead of return the error code, it returns the value entered
@@ -139,20 +139,19 @@ mk_part() {
 	_swaps=$(d_read SWAPS)
 	
 	if [ "$_mode" == "bios" ]; then
-		parted -s /dev/"$_disk" mklabel msdos
-		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 1MiB 200MiB
-		parted -s -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
-		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
-		parted -s /dev/"$_disk" set 1 boot on 
+		parted --script /dev/"$_disk" mklabel msdos
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 1 200MiB
+		parted --script -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
+		parted --script /dev/"$_disk" set 1 boot on 
 	else
-		parted -s /dev/"$_disk" mklabel msdos
-		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 1MiB 200MiB
-		parted -s -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
-		parted -s -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
-		parted -s /dev/"$_disk" set 1 ESP on
+		parted --script /dev/"$_disk" mklabel msdos
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 1 200MiB
+		parted --script -a optimal /dev/"$_disk" mkpart primary linux-swap 200MiB "$_swaps"GB
+		parted --script -a optimal /dev/"$_disk" mkpart primary ext2 "$_swaps"GB 100%
+		parted --script /dev/"$_disk" set 1 ESP on
 		
 	fi	
-		parted -s /dev/"$_disk" set 2 swap on 
 		partx -u /dev/"$_disk"
 		mkfs.ext4 /dev/"$_disk"3
 		mkswap /dev/"$_disk"2
