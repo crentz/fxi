@@ -139,11 +139,11 @@ mk_part() {
 	fi	
 	
 		parted -s /dev/"$_disk" mkpart primary ext2 200MB 100%
-		mkfs.ext4 /dev/"$_disk"2
+		mkfs.ext4 /dev/"$_disk"2 >/dev/null
 	if [ "$_mode" == "bios" ]; then
-		mkfs.ext4 /dev/"$_disk"1
+		mkfs.ext4 /dev/"$_disk"1 >/dev/null
 	else
-		mkfs.fat -F 32 /dev/"$_disk"1
+		mkfs.fat -F 32 /dev/"$_disk"1 >/dev/null
 	fi
 		partx -u /dev/"$_disk"
 		
@@ -198,7 +198,6 @@ for ((i=0; i<=100; i+=1)); do
 timezone() {
 	arch-chroot /mnt apt-get update
 	arch-chroot /mnt apt-get install dphys-swapfile -y -qq
-	arch-chroot /mnt dphys-swapfile install
 	arch-chroot /mnt dpkg-reconfigure tzdata
 	arch-chroot /mnt dpkg-reconfigure locales
 }
@@ -209,7 +208,7 @@ exitstatus=$?
 if [ $exitstatus = 0 ]; then
     d_conf HOSTNAME "$hostname"
     echo "$hostname" | sudo tee /mnt/etc/hostname >/dev/null
-	cat <<EOF > | sudo tee /mnt/etc/hosts >/dev/null
+	cat <<EOF | sudo tee /mnt/etc/hosts >/dev/null
 127.0.0.1	localhost
 127.0.1.1	$hostname
 # The following lines are desirable for IPv6 capable hosts
@@ -230,11 +229,7 @@ PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root P
 if [[ "$PASSWD" == "$PASSWD_CHECK" ]]; then
 	arch-chroot /mnt echo -e "$PASSWD\n$PASSWD" | passwd
 else
-PASSWD2=$(whiptail --title "Fluxuan-Installer" --passwordbox "Mismatch / Choose ROOT Password" 10 60 3>&1 1>&2 2>&3)
-PASSWD2_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 60 3>&1 1>&2 2>&3)
-
-if [[ "$PASSWD2" == "$PASSWD2_CHECK" ]]; then
-	arch-chroot echo -e "$PASSWD2\n$PASSWD2" | passwd
+set_pass
 fi
 }
 
@@ -246,8 +241,10 @@ name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Flux
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
 	d_conf NAME "$name"
-    arch-chroot /mnt useradd -m "$name"
-	arch-chroot /mnt userdel -r "$LOGNAME"
+    chroot /mnt useradd -m "$name"
+    arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+    arch-chroot /mnt usermod -s /bin/bash "$name"
+	chroot /mnt userdel -r $(logname)
 else
 rm "$CONF" ;
     exit 1 ;
@@ -258,16 +255,10 @@ PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify U
 
 if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
 	arch-chroot /mnt echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
-	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
-	arch-chroot /mnt usermod -s /bin/bash "$_name"
+	
+	
 else
-PASSWD2_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Mismatch / Choose USER Password" 10 60 3>&1 1>&2 2>&3)
-PASSWD2_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password" 10 60 3>&1 1>&2 2>&3)
-
-if [[ "$PASSWD2_USER" == "$PASSWD2_CHECK_USER" ]]; then
-	arch-chroot /mnt echo -e "$PASSWD2_USER\n$PASSWD2_USER" | passwd "$_name"
-	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
-	arch-chroot /mnt usermod -s /bin/bash "$_name"
+set_default_user
 fi
 
 }
