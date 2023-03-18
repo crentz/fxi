@@ -97,31 +97,19 @@ else
     exit 1 ;
 fi
 
-swaps=$(whiptail --inputbox "Choose the size of swap in GB (e.g. 2):" 8 78 2 --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
-# Meaning instead of return the error code, it returns the value entered
-
-# Now to check if the user pressed OK or Cancel
-exitstatus=$?
-if [ $exitstatus = 0 ]; then
-    d_conf SWAPS "$swaps"
-else
-    exit 1 ;
-fi
 
 whiptail --title "Fluxuan-Installer" --msgbox "Custom partitioning schemes are not yet supported.
 The default scheme will be:
 
 1-> 200mb Boot Partition on /dev/${disk}1
 
-2-> SWAP Partition of your choosing on /dev/${disk}2
+2-> Automatic SWAP in /etc/dphys-swapfile adjust if you really need to
 
 3-> Root Partition of the remaining space on /dev/${disk}3" 15 65 ;
 
 if (whiptail --title "Fluxuan-Installer" --yesno "Proceed? (all data on $disk will be deleted, so make sure you backed up anything important)." 8 78); then
-    		d_conf BOOTP "$disk"1
-		d_conf SWAPP "$disk"2
-		d_conf ROOTP "$disk"3
+    	d_conf BOOTP "$disk"1
+		d_conf ROOTP "$disk"2
 		mk_part
 else
     exit 1 ;
@@ -136,37 +124,33 @@ mk_part() {
 	local _disk _mode _swaps
 	_disk=$(d_read DISK)
 	_mode=$(d_read MODE)
-	_swaps=$(d_read SWAPS)
-	wipefs -af /dev/"$_disk"
-	sgdisk -Zo /dev/"$_disk"
-	parted --script /dev/"$_disk" mklabel msdos
+	
+	
+	
 	if [ "$_mode" == "bios" ]; then
-		parted --script -a none /dev/"$_disk" mkpart primary 1MiB 200MiB
-		parted --script /dev/"$_disk" set 1 boot on 
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s /dev/"$_disk" mkpart primary ext2 1 200MB
+		parted -s /dev/"$_disk" set 1 boot on 
 	else
-		parted --script -a optimal /dev/"$_disk" mkpart primary 1MiB 200MiB
-		parted --script /dev/"$_disk" set 1 ESP on
+		parted -s /dev/"$_disk" mklabel gpt
+		parted -s /dev/"$_disk" mkpart primary ext2 1 200MB
+		parted -s /dev/"$_disk" set 1 ESP on
 		
 	fi	
-		parted --script -a none /dev/"$_disk" mkpart primary 200MiB "$_swaps"GB
-		parted --script -a none /dev/"$_disk" mkpart primary "$_swaps"GB 100%
-		sleep 2
-		partx -u /dev/"$_disk"
-		
+	
+		parted -s /dev/"$_disk" mkpart primary ext2 200MB 100%
+		mkfs.ext4 /dev/"$_disk"2
 	if [ "$_mode" == "bios" ]; then
 		mkfs.ext4 /dev/"$_disk"1
-		
 	else
 		mkfs.fat -F 32 /dev/"$_disk"1
 	fi
-		mkfs.ext4 /dev/"$_disk"3
-		mkswap /dev/"$_disk"2
-		swapon /dev/"$_disk"2
 		partx -u /dev/"$_disk"
-for ((i=0; i<=100; i+=1)); do
+		
+		for ((i=0; i<=100; i+=1)); do
         sleep 0.1
         echo "$i"
-    done
+   		done
 
 } | whiptail --gauge "Creating Partitions on your disk" 6 60 0
 }
@@ -176,7 +160,7 @@ copy_sys () {
 local  _mode _disk
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
-	mount /dev/"$_disk"3 /mnt
+	mount /dev/"$_disk"2 /mnt
 	if [ "$_mode" == "bios" ]; then
 		mkdir -p /mnt/boot
 		mount /dev/"$_disk"1 /mnt/boot
@@ -192,7 +176,7 @@ if [[ -f /mnt/usr/sbin/update-initramfs.debian ]] ; then
     cp /mnt/usr/sbin/update-initramfs.debian /mnt/usr/sbin/update-initramfs
 fi
 
-genfstab -U /mnt >> /mnt/etc/fstab &
+genfstab -U /mnt | sudo tee /mnt/etc/fstab >/dev/null
 
 for ((i=0; i<=100; i+=1)); do
         proc=$(ps -aux | grep -v grep | grep -e "rsync")
@@ -212,22 +196,20 @@ for ((i=0; i<=100; i+=1)); do
 }
 
 timezone() {
-	arch-chroot /mnt dpkg-reconfigure tzdata && sleep 2
+	arch-chroot /mnt apt-get update
+	arch-chroot /mnt apt-get install dphys-swapfile -y -qq
+	arch-chroot /mnt dphys-swapfile install
+	arch-chroot /mnt dpkg-reconfigure tzdata
 	arch-chroot /mnt dpkg-reconfigure locales
-
 }
 
 set_hostname() {
 hostname=$(whiptail --inputbox "Input your desired hostname" 8 78 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
-# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
-# Meaning instead of return the error code, it returns the value entered
-
-# Now to check if the user pressed OK or Cancel
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
     d_conf HOSTNAME "$hostname"
-    echo "$hostname" > /mnt/etc/hostname
-	cat <<EOF > /mnt/etc/hosts
+    echo "$hostname" | sudo tee /mnt/etc/hostname >/dev/null
+	cat <<EOF > | sudo tee /mnt/etc/hosts >/dev/null
 127.0.0.1	localhost
 127.0.1.1	$hostname
 # The following lines are desirable for IPv6 capable hosts
@@ -242,14 +224,17 @@ fi
 }
 
 set_pass() {
-PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your ROOT Password." 10 60 3>&1 1>&2 2>&3)
+PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose ROOT Password" 10 60 3>&1 1>&2 2>&3)
 PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 60 3>&1 1>&2 2>&3)
 
 if [[ "$PASSWD" == "$PASSWD_CHECK" ]]; then
-	echo -e "$PASSWD\n$PASSWD" | passwd
+	arch-chroot /mnt echo -e "$PASSWD\n$PASSWD" | passwd
 else
-	rm "$CONF" ;
-	exit 1 ;
+PASSWD2=$(whiptail --title "Fluxuan-Installer" --passwordbox "Mismatch / Choose ROOT Password" 10 60 3>&1 1>&2 2>&3)
+PASSWD2_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 60 3>&1 1>&2 2>&3)
+
+if [[ "$PASSWD2" == "$PASSWD2_CHECK" ]]; then
+	arch-chroot echo -e "$PASSWD2\n$PASSWD2" | passwd
 fi
 }
 
@@ -258,30 +243,31 @@ local _name
 	_name=$(d_read NAME)
 	
 name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-# The `3>&1 1>&2 2>&3` is a small trick to swap the stderr with stdout
-# Meaning instead of return the error code, it returns the value entered
-
-# Now to check if the user pressed OK or Cancel
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
 	d_conf NAME "$name"
-	arch-chroot /mnt useradd "$name"
-    	arch-chroot /mnt usermod -l "$name" fluxuan
-	arch-chroot /mnt usermod -m -d /home/"$name" "$name"
+    arch-chroot /mnt useradd -m "$name"
+	arch-chroot /mnt userdel -r "$LOGNAME"
 else
 rm "$CONF" ;
     exit 1 ;
 fi
 
-PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your USER Password." 10 60 3>&1 1>&2 2>&3)
-PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password " 10 60 3>&1 1>&2 2>&3)
+PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password" 10 60 3>&1 1>&2 2>&3)
+PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password" 10 60 3>&1 1>&2 2>&3)
 
 if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
-	echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
-	arch-chroot /mnt usermod -aG wheel,cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
+	arch-chroot /mnt echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
+	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
 	arch-chroot /mnt usermod -s /bin/bash "$_name"
 else
-	exit 1 ;
+PASSWD2_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Mismatch / Choose USER Password" 10 60 3>&1 1>&2 2>&3)
+PASSWD2_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password" 10 60 3>&1 1>&2 2>&3)
+
+if [[ "$PASSWD2_USER" == "$PASSWD2_CHECK_USER" ]]; then
+	arch-chroot /mnt echo -e "$PASSWD2_USER\n$PASSWD2_USER" | passwd "$_name"
+	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
+	arch-chroot /mnt usermod -s /bin/bash "$_name"
 fi
 
 }
@@ -293,12 +279,12 @@ setup_grub() {
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
 	if [ "$_mode" == "bios" ]; then
-		arch-chroot /mnt grub-install /dev/"$_disk" >>/dev/null
-		arch-chroot /mnt update-grub >>/dev/null
+		arch-chroot /mnt grub-install /dev/"$_disk" >/dev/null
+		arch-chroot /mnt update-grub >/dev/null
 	else
-		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >>/dev/null
-		arch-chroot /mnt grub-install /dev/"$_disk" >>/dev/null
-		arch-chroot /mnt update-grub >>/dev/null
+		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >/dev/null
+		arch-chroot /mnt grub-install /dev/"$_disk" >/dev/null
+		arch-chroot /mnt update-grub >/dev/null
 	fi
 	for ((i=0; i<=100; i+=1)); do
         sleep 0.1
