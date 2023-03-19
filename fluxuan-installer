@@ -234,7 +234,7 @@ fi
 }
 
 set_default_user() {
-oldname=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 local _name
 	_name=$(d_read NAME)
 	
@@ -257,11 +257,11 @@ if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
 	arch-chroot /mnt usermod -d /home/"$_name" -m "$_name"
 	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
     	arch-chroot /mnt usermod -s /bin/bash "$_name"
-	for i in $(grep -r "/home/$oldname" /target/home/$_name/.config | awk -F":" '{ print $1 }'); do
+	for i in $(grep -r "/home/$oldname" /mnt/home/$_name/.config | awk -F":" '{ print $1 }'); do
 	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
 	done
 
-	for i in $(grep -r "/home/$oldname" /target/home/$_name/.local | awk -F":" '{ print $1 }'); do
+	for i in $(grep -r "/home/$oldname" /mnt/home/$_name/.local | awk -F":" '{ print $1 }'); do
 	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
 	done
    	
