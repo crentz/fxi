@@ -139,11 +139,11 @@ mk_part() {
 	fi	
 	
 		parted -s /dev/"$_disk" mkpart primary ext2 200MB 100%
-		mkfs.ext4 /dev/"$_disk"2 >/dev/null
+		mkfs.ext4 /dev/"$_disk"2 >>/dev/null
 	if [ "$_mode" == "bios" ]; then
-		mkfs.ext4 /dev/"$_disk"1 >/dev/null
+		mkfs.ext4 /dev/"$_disk"1 >>/dev/null
 	else
-		mkfs.fat -F 32 /dev/"$_disk"1 >/dev/null
+		mkfs.fat -F 32 /dev/"$_disk"1 >>/dev/null
 	fi
 		partx -u /dev/"$_disk"
 		
@@ -234,10 +234,9 @@ fi
 }
 
 set_default_user() {
-oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 local _name
 	_name=$(d_read NAME)
-	
+oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
