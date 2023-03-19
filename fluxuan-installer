@@ -139,11 +139,11 @@ mk_part() {
 	fi	
 	
 		parted -s /dev/"$_disk" mkpart primary ext2 200MB 100%
-		mkfs.ext4 /dev/"$_disk"2 >>/dev/null
+		mke2fs.ext4 /dev/"$_disk"2 >> /dev/null 2>&1
 	if [ "$_mode" == "bios" ]; then
-		mkfs.ext4 /dev/"$_disk"1 >>/dev/null
+		mkfs.ext4 /dev/"$_disk"1 >> /dev/null 2>&1
 	else
-		mkfs.fat -F 32 /dev/"$_disk"1 >>/dev/null
+		mkfs.fat -F 32 /dev/"$_disk"1 >> /dev/null 2>&1
 	fi
 		partx -u /dev/"$_disk"
 		
@@ -194,10 +194,30 @@ for ((i=0; i<=100; i+=1)); do
         sleep 2
 } | whiptail --gauge "Installing Operating System" 6 60 0
 }
-
-timezone() {
-	arch-chroot /mnt apt-get update
+swap() {
+{
+	if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to use SWAP. YES to create it or NO to continue without SWAP." 8 78); then
 	arch-chroot /mnt apt-get install dphys-swapfile -y -qq
+	else
+  	continue
+	fi
+	for ((i=0; i<=100; i+=1)); do
+        proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo "$i"
+           
+        i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Installing Operating System" 6 60 0
+}
+timezone() {
 	arch-chroot /mnt dpkg-reconfigure tzdata
 	arch-chroot /mnt dpkg-reconfigure locales
 }
@@ -241,6 +261,18 @@ name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Flux
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
 	d_conf NAME "$name"
+	arch-chroot /mnt usermod -l "$name" "$oldname"
+	arch-chroot /mnt groupmod -n "$name" "$oldname"
+	arch-chroot /mnt usermod -d /home/"$name" -m "$_name"
+	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+    	arch-chroot /mnt usermod -s /bin/bash "$name"
+	for i in $(grep -r "/home/$oldname" /mnt/home/$name/.config | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$name/g" "$i"
+	done
+
+	for i in $(grep -r "/home/$oldname" /mnt/home/$_name/.local | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
+	done
     
 else
 rm "$CONF" ;
@@ -251,20 +283,9 @@ PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Pa
 PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password" 10 60 3>&1 1>&2 2>&3)
 
 if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
-	arch-chroot /mnt usermod -l "$_name" "$oldname"
-	arch-chroot /mnt groupmod -n "$_name" "$oldname"
-	arch-chroot /mnt usermod -d /home/"$_name" -m "$_name"
-	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
-    	arch-chroot /mnt usermod -s /bin/bash "$_name"
-	for i in $(grep -r "/home/$oldname" /mnt/home/$_name/.config | awk -F":" '{ print $1 }'); do
-	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
-	done
-
-	for i in $(grep -r "/home/$oldname" /mnt/home/$_name/.local | awk -F":" '{ print $1 }'); do
-	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
-	done
-   	
-	arch-chroot /mnt echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
+	
+   	sleep 2
+	chroot /mnt echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
 	
 	
 else
@@ -312,6 +333,7 @@ do_install() {
 	ask_part
 	mk_part
 	copy_sys
+	swap
 	timezone
 	locale
 	set_hostname
