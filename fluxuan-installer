@@ -179,7 +179,7 @@ fi
 genfstab -U /mnt | sudo tee /mnt/etc/fstab >/dev/null
 
 for ((i=0; i<=100; i+=1)); do
-        proc=$(ps -aux | grep -v grep | grep -e "rsync")
+        proc=$(ps aux | grep -v grep | grep -e "rsync")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -234,6 +234,7 @@ fi
 }
 
 set_default_user() {
+oldname=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
 local _name
 	_name=$(d_read NAME)
 	
@@ -241,10 +242,7 @@ name=$(whiptail --inputbox "Create default USERNAME:" 8 78 fluxuan --title "Flux
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
 	d_conf NAME "$name"
-    chroot /mnt useradd -m "$name"
-    arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
-    arch-chroot /mnt usermod -s /bin/bash "$name"
-	chroot /mnt userdel -r $(logname)
+    
 else
 rm "$CONF" ;
     exit 1 ;
@@ -254,6 +252,19 @@ PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Pa
 PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password" 10 60 3>&1 1>&2 2>&3)
 
 if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
+	arch-chroot /mnt usermod -l "$_name" "$oldname"
+	arch-chroot /mnt groupmod -n "$_name" "$oldname"
+	arch-chroot /mnt usermod -d /home/"$_name" -m "$_name"
+	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$_name"
+    	arch-chroot /mnt usermod -s /bin/bash "$_name"
+	for i in $(grep -r "/home/$oldname" /target/home/$_name/.config | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
+	done
+
+	for i in $(grep -r "/home/$oldname" /target/home/$_name/.local | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$_name/g" "$i"
+	done
+   	
 	arch-chroot /mnt echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$_name"
 	
 	
@@ -270,12 +281,12 @@ setup_grub() {
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
 	if [ "$_mode" == "bios" ]; then
-		arch-chroot /mnt grub-install /dev/"$_disk" >/dev/null
-		arch-chroot /mnt update-grub >/dev/null
+		arch-chroot /mnt grub-install /dev/"$_disk" >>/dev/null
+		arch-chroot /mnt update-grub >>/dev/null
 	else
-		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >/dev/null
-		arch-chroot /mnt grub-install /dev/"$_disk" >/dev/null
-		arch-chroot /mnt update-grub >/dev/null
+		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >>/dev/null
+		arch-chroot /mnt grub-install /dev/"$_disk" >>/dev/null
+		arch-chroot /mnt update-grub >>/dev/null
 	fi
 	for ((i=0; i<=100; i+=1)); do
         sleep 0.1
