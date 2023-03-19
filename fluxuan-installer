@@ -197,12 +197,16 @@ for ((i=0; i<=100; i+=1)); do
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-	mount --bind /dev/ /mnt/dev/
-	mount --bind /proc/ /mnt/proc/
-	mount --bind /sys/ /mnt/sys/
+	mount --bind /dev /mnt/dev
+	mount --bind /dev/pts /mnt/dev/pts
+	mount --bind /proc /mnt/proc
+	mount --bind /sys /mnt/sys
+	mount --bind /run /mnt/run
+	
 } | whiptail --gauge "Installing Operating System" 6 60 0
 }
-swap() {
+
+swap () {
 {
 	if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to use SWAP. YES to create it or NO to continue without SWAP." 8 78); then
 	chroot /mnt apt-get install dphys-swapfile -y -qq
@@ -225,12 +229,13 @@ swap() {
         sleep 2
 } | whiptail --gauge "Installing Operating System" 6 60 0
 }
-timezone() {
+
+timezone () {
 	chroot /mnt dpkg-reconfigure tzdata
 	chroot /mnt dpkg-reconfigure locales
 }
 
-set_hostname() {
+set_hostname () {
 hostname=$(whiptail --inputbox "Input your desired hostname" 8 78 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
@@ -250,7 +255,7 @@ else
 fi
 }
 
-set_pass() {
+set_pass () {
 PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose ROOT Password" 10 60 3>&1 1>&2 2>&3)
 PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 60 3>&1 1>&2 2>&3)
 
@@ -261,7 +266,7 @@ set_pass
 fi
 }
 
-set_default_user() {
+set_default_user () {
 local _name
 	_name=$(d_read NAME)
 oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
@@ -303,7 +308,7 @@ fi
 }
 
 
-setup_grub() {
+setup_grub () {
 {
 	local _mode _disk
 	_mode=$(d_read MODE)
@@ -328,7 +333,7 @@ setup_grub() {
 } | whiptail --gauge "Installing Grub please wait..." 6 60 0
 }
 
-finish() {
+finish () {
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
     reboot
@@ -338,7 +343,7 @@ finish() {
 	fi
 }
 
-do_install() {
+do_install () {
 	welcome_msg
 	install_dep
 	ask_part
