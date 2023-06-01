@@ -16,7 +16,7 @@
 #		Thank you for your interest in Fluxuan Linux !!
 
 
-CONF=${disk_conf:"/tmp/disk.conf"}
+CONF=${disk_conf:="/tmp/disk.conf"}
 d_conf () {
 	local _conf=$1 _value=$2
 	printf '%s\n' "${_conf}=${_value}" >> "$CONF"
@@ -267,7 +267,7 @@ offline_inst () {
 	if [ "$_offline" == "YES" ]; then
 	choose_release
 	else
-	rsync -aHAXS --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found"} / /mnt
+	rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome"} / /mnt
 	fi
 	for ((i=0; i<=100; i+=1)); do
        proc=$(pgrep -w "rsync")
@@ -292,9 +292,9 @@ offline_inst () {
 offline_inst
 choose_release() {
 CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose one of the following options." 20 70 5 \
-	1 "Fluxuan - Stable (based on Devuan)" 3>&2 2>&1 1>&3  \
-	2 "Fluxuan - Testing (based on Devuan)" 3>&2 2>&1 1>&3  \
-	3 "Fluxuan - Rolling (based on Devuan)" 3>&2 2>&1 1>&3 \
+	1 "Fluxuan - Stable (based on Devuan Chimaera)" 3>&2 2>&1 1>&3  \
+	2 "Fluxuan - Testing (based on Devuan Daedalus)" 3>&2 2>&1 1>&3  \
+	3 "Fluxuan - Unstable (based on Devuan Ceres)" 3>&2 2>&1 1>&3 \
 
 )
 case $CHOICE in
@@ -521,13 +521,13 @@ choose_init
 
 install_packages () {
 {
-	if [ -d "/home/$(logname)/.config/fluxuan-installer" ]; then
-	arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/deb/*
+	if [ -d "/home/$(logname)/.config/fxs" ]; then
+	arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/fxs/deb/*
 	else
 	return 0 ;
 	fi
-	if [ -f "/home/$(logname)/.config/*.pkgs" ]; then
-    arch_chroot /mnt xargs apt-get install -y </home/"$(logname)"/.config/*.pkgs
+	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
+    arch_chroot /mnt xargs apt-get install -y </home/"$(logname)"/.config/fxs/*.pkgs
     else
     return 0 ;
 	fi
