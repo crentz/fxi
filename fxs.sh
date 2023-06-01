@@ -109,7 +109,7 @@ for ((i=0; i<=100; i+=1)); do
 
 get_system () {
 {
-rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/home/fxs","/home/snapshot"} /* /home/fxs/chroot
+rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/home/fxs","/home/snapshot"} / /home/fxs/chroot
 for ((i=0; i<=100; i+=1)); do
         proc=$(pgrep -w "rsync")
             if [[ "$proc" == "" ]]; then break; fi
@@ -140,7 +140,6 @@ touch /home/fxs/tmp/grub-embed.cfg
 copy_boot () {
 {
 printf "" > /home/fxs/chroot/etc/fstab
-cp /etc/resolv.conf /home/fxs/chroot/etc/
 cp /home/fxs/chroot/boot/vmlinuz-* /home/fxs/staging/live/vmlinuz
 cp /home/fxs/chroot/boot/initrd.img-* /home/fxs/staging/live/initrd
 cp /home/fxs/staging/boot/grub/grub.cfg /home/fxs/staging/EFI/BOOT/
@@ -246,6 +245,11 @@ for ((i=0; i<=100; i+=1)); do
 }
 
 make_change () {
+mount --bind /proc /home/fxs/chroot/proc
+mount --bind /sys /home/fxs/chroot/sys
+mount --bind /dev /home/fxs/chroot/dev
+export HOME=/root
+export LC_ALL=C
 whiptail --title "Make Changes" --msgbox "Your Operating System is ready for changes.
 If you want to make any changes head to: 
 -> /home/fxs/chroot <-
@@ -258,11 +262,6 @@ https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65 ;
 
 chroot_OS () {
 if (whiptail --title "Chroot System" --yesno "Do you want to chroot into your system and install remove programs?" 8 78); then
-mount --bind /proc /home/fxs/chroot/proc
-mount --bind /sys /home/fxs/chroot/sys
-mount --bind /dev /home/fxs/chroot/dev
-export HOME=/root
-export LC_ALL=C
 chroot /home/fxs/chroot /bin/bash
 else
 return 0;
@@ -277,7 +276,7 @@ umount /home/fxs/chroot/proc
 umount /home/fxs/chroot/sys
 umount /home/fxs/chroot/dev
 export HISTSIZE=0
-mksquashfs /home/fxs/chroot /home/fxs/staging/boot/filesystem.squashfs -b 1048576 -comp xz -e boot &
+mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -b 1048576 -comp xz -e boot &
 for ((i=0; i<=100; i+=1)); do   
             sleep 20
             echo "$i"
