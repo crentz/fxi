@@ -304,6 +304,7 @@ case $CHOICE in
 	deb-src http://deb.devuan.org/merged stable-security main contrib non-free
 	deb http://deb.devuan.org/merged stable-updates main contrib non-free
 	deb-src http://deb.devuan.org/merged stable-updates main contrib non-free" > /mnt/etc/apt/sources.list
+	
 	i="0"
         while (true)
         do
@@ -383,7 +384,7 @@ mk_swap () {
 	local _swap _offline
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
-	sudo arch-chroot genfstab -U -p /mnt >> /mnt/etc/fstab'
+	sudo arch-chroot genfstab -U -p /mnt | sudo tee -a /mnt/etc/fstab
 	sudo arch-chroot /mnt apt-get update
 	sudo arch-chroot /mnt apt-get install locales -y
 	sudo arch-chroot /mnt /usr/sbin/update-initramfs -u
