@@ -31,7 +31,7 @@ check_root () {
 if [ "$(id -u)" -ne 0 ]; then 
 whiptail --title "Fluxuan-Installer" --msgbox "It appears that you are running this installer as user.
 
-Please run as ROOT (e. g.: sudo bash fluxuan-installer) 
+Please run as ROOT (e. g.:  sudo bash fluxuan-installer) 
 -------------------------------------------------------
 Thank you for your interest in Fluxuan Linux.
 
@@ -266,7 +266,7 @@ offline_inst () {
 	if [ "$_offline" == "YES" ]; then
 	choose_release
 	else
-	sudo rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+	  rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	fi
 	i="0"
         while (true)
@@ -384,12 +384,14 @@ mk_swap () {
 	local _swap _offline
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
-	sudo arch-chroot genfstab -U -p /mnt | sudo tee -a /mnt/etc/fstab
-	sudo arch-chroot /mnt apt-get update
-	sudo arch-chroot /mnt apt-get install locales -y
-	sudo arch-chroot /mnt /usr/sbin/update-initramfs -u
+	mount --bind /dev/ /mnt/target/dev/
+	mount --bind /proc/ /mnt/target/proc/
+	mount --bind /sys/ /mnt/target/sys/
+	bash -c 'genfstab -t LABEL /mnt >> /mnt/etc/fstab'
+	   chroot /mnt apt-get update
+	   chroot /mnt apt-get install locales -y
 	if [ "$_swap" == "YES" ]; then
-	sudo arch-chroot /mnt apt-get install dphys-swapfile -y
+	   chroot /mnt apt-get install dphys-swapfile -y
 	else
 	return 0;
 	fi
@@ -402,7 +404,7 @@ mk_swap () {
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e " chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -431,14 +433,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
 	else
-	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -461,14 +463,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	else
-	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -490,14 +492,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	else
-	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -518,21 +520,21 @@ choose_init
 
 install_packages () {
 {
-	
-	if [ -d "/home/$(logname)/.config/fxs" ]; then
-	sudo arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/fxs/deb/*
+	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+	if [ -d "/home/$oldnam/.config/fxs" ]; then
+	  arch_chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
 	else
 	return 0 ;
 	fi
 	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
-    sudo arch_chroot /mnt xargs apt-get install -y </home/"$(logname)"/.config/fxs/*.pkgs
+      arch_chroot /mnt xargs apt-get install -y </home/"$oldnam"/.config/fxs/*.pkgs
     else
     return 0 ;
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -576,22 +578,15 @@ fi
 set_hostname
 
 timezone() {
-	sudo arch-chroot /mnt dpkg-reconfigure tzdata
+	  chroot /mnt dpkg-reconfigure tzdata
 	
 }
 timezone
 
 locales() {
-local _offline
-	_offline=$(d_read offline)
-	if [ "$_offline" == "YES" ]; then
-	sudo arch-chroot /mnt dpkg-reconfigure locales
-	else
-	sudo arch-chroot /mnt apt-get update
-	sudo arch-chroot /mnt /bin/bash export LC_ALL=C
-	sudo arch-chroot /mnt apt-get install -f -y -qq
-	sudo arch-chroot /mnt dpkg-reconfigure locales
-	fi
+
+	  chroot /mnt dpkg-reconfigure locales
+
 }
 locales
 
@@ -599,9 +594,9 @@ xkb_cons() {
 	local _offline
 	_offline=$(d_read offline)
 	if [ "$_offline" == "YES" ]; then
-	sudo arch-chroot /mnt apt install console-setup keyboard-configuration -y
+	  chroot /mnt apt install console-setup keyboard-configuration -y
 	else
-	sudo arch-chroot /mnt dpkg-reconfigure keyboard-configuration
+	  chroot /mnt dpkg-reconfigure keyboard-configuration
 	fi
 }
 xkb_cons
@@ -630,15 +625,16 @@ set_default_user() {
 	_offline=$(d_read offline)
 	if [ "$_offline" == "YES" ]; then
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	sudo arch-chroot /mnt useradd -m "$name"
-	sudo arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
-	sudo arch-chroot /mnt usermod -s /bin/bash "$name"
+	  chroot /mnt useradd -m "$name"
+	  chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+	  chroot /mnt usermod -s /bin/bash "$name"
 	cp -r /etc/skel /mnt/etc/
 	chmod +x /mnt/etc/skel/.local/bin/*
 	else
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	sudo arch-chroot /mnt usermod -l "$name" "$(logname)"	
-	sudo arch-chroot /mnt usermod -m -d /home/"$name" "$name"	
+	oldname=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+	  chroot /mnt usermod -l "$name" "$oldname"	
+	  chroot /mnt usermod -d /home/"$name" -m "$name"	
 	fi
 	sleep 1
     PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
@@ -664,18 +660,18 @@ setup_grub() {
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
 	if [ "$_mode" == "bios" ]; then
-		sudo arch-chroot /mnt apt-get install grub-pc -y 
-		sudo arch-chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
-		sudo arch-chroot /mnt update-grub
+		  chroot /mnt apt-get install grub-pc -y 
+		  chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
+		  chroot /mnt update-grub
 	else
-		sudo arch-chroot /mnt apt-get install grub-efi-amd64 -y 
-		sudo arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
-		sudo arch-chroot /mnt update-grub
+		  chroot /mnt apt-get install grub-efi-amd64 -y 
+		  chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
+		  chroot /mnt update-grub
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "update-grub")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -692,15 +688,16 @@ setup_grub() {
 setup_grub
 
 finish() {
+	oldn=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
-	rm -rf "/home/$(logname)/.config/fxs/deb" ;
-	rm "/home/$(logname)/.config/fxs/*.pkgs" ;
+	rm -rf "/home/$oldn/.config/fxs/deb" ;
+	rm "/home/$oldn/.config/fxs/*.pkgs" ;
     shutdown -r now
 	else
     rm "$CONF" ;
-    rm -rf "/home/$(logname)/.config/fxs/deb" ;
-	rm "/home/$(logname)/.config/fxs/*.pkgs" ;
+    rm -rf "/home/$oldn/.config/fxs/deb" ;
+	rm "/home/$oldn/.config/fxs/*.pkgs" ;
     exit 0 ;
 	fi
 }
