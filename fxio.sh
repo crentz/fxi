@@ -59,6 +59,25 @@ https://Fluxuan.org - https://Forums.Fluxuan.org" 20 70
 }
 welcome_msg
 select_drive() {
+
+disk=$(whiptail --inputbox "Choose one of your available devices (e.g. sdX):
+------------------------------------------------
+
+$(lsblk -n --output TYPE,NAME,SIZE,MODEL | awk '$1=="disk"{print i++,"->",$2,$3,$4}')" 20 70 sdX --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf DISK "$disk"
+else
+ whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
+
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
+    exit 1 ;
+fi
+
 mode=$(whiptail --inputbox "Will you boot in bios or EFI mode (-- bios or EFI --)?
 ------------------------------------------------------" 20 70 bios --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 exitstatus=$?
