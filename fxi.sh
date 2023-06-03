@@ -384,11 +384,11 @@ mk_swap () {
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
 	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
-	arch-chroot /mnt apt-get update
-	arch-chroot /mnt apt-get install locales -y
-	arch-chroot /mnt /usr/sbin/update-initramfs -u
+	sudo arch-chroot /mnt apt-get update
+	sudo arch-chroot /mnt apt-get install locales -y
+	sudo arch-chroot /mnt /usr/sbin/update-initramfs -u
 	if [ "$_swap" == "YES" ]; then
-	arch-chroot /mnt apt-get install dphys-swapfile -y
+	sudo arch-chroot /mnt apt-get install dphys-swapfile -y
 	else
 	return 0;
 	fi
@@ -401,7 +401,7 @@ mk_swap () {
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -430,14 +430,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
 	else
-	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -460,14 +460,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	else
-	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -489,14 +489,14 @@ case $CHOICE in
 	{
 	if [ "$(getconf LONG_BIT)" = "64" ]
 	then
-	arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	sudo arch-chroot /mnt apt-get install linux-image-amd64 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	else
-	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	sudo arch-chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -519,19 +519,19 @@ install_packages () {
 {
 	
 	if [ -d "/home/$(logname)/.config/fxs" ]; then
-	arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/fxs/deb/*
+	sudo arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/fxs/deb/*
 	else
 	return 0 ;
 	fi
 	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
-    arch_chroot /mnt xargs apt-get install -y </home/"$(logname)"/.config/fxs/*.pkgs
+    sudo arch_chroot /mnt xargs apt-get install -y </home/"$(logname)"/.config/fxs/*.pkgs
     else
     return 0 ;
 	fi
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
+            proc=$(ps aux | grep -v grep | grep -e "sudo arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -575,7 +575,7 @@ fi
 set_hostname
 
 timezone() {
-	arch-chroot /mnt dpkg-reconfigure tzdata
+	sudo arch-chroot /mnt dpkg-reconfigure tzdata
 	
 }
 timezone
@@ -584,12 +584,12 @@ locales() {
 local _offline
 	_offline=$(d_read offline)
 	if [ "$_offline" == "YES" ]; then
-	arch-chroot /mnt dpkg-reconfigure locales
+	sudo arch-chroot /mnt dpkg-reconfigure locales
 	else
-	arch-chroot /mnt apt-get update
-	arch-chroot /mnt /bin/bash export LC_ALL=C
-	arch-chroot /mnt apt-get install -f -y -qq
-	arch-chroot /mnt dpkg-reconfigure locales
+	sudo arch-chroot /mnt apt-get update
+	sudo arch-chroot /mnt /bin/bash export LC_ALL=C
+	sudo arch-chroot /mnt apt-get install -f -y -qq
+	sudo arch-chroot /mnt dpkg-reconfigure locales
 	fi
 }
 locales
@@ -598,9 +598,9 @@ xkb_cons() {
 	local _offline
 	_offline=$(d_read offline)
 	if [ "$_offline" == "YES" ]; then
-	arch-chroot /mnt apt install console-setup keyboard-configuration -y
+	sudo arch-chroot /mnt apt install console-setup keyboard-configuration -y
 	else
-	arch-chroot /mnt dpkg-reconfigure keyboard-configuration
+	sudo arch-chroot /mnt dpkg-reconfigure keyboard-configuration
 	fi
 }
 xkb_cons
@@ -629,15 +629,15 @@ set_default_user() {
 	_offline=$(d_read offline)
 	if [ "$_offline" == "YES" ]; then
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	arch-chroot /mnt useradd -m "$name"
-	arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
-	arch-chroot /mnt usermod -s /bin/bash "$name"
+	sudo arch-chroot /mnt useradd -m "$name"
+	sudo arch-chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+	sudo arch-chroot /mnt usermod -s /bin/bash "$name"
 	cp -r /etc/skel /mnt/etc/
 	chmod +x /mnt/etc/skel/.local/bin/*
 	else
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	arch-chroot /mnt /bin/bash usermod -l "$name" "$(logname)"	
-	arch-chroot /mnt /bin/bash usermod -m -d /home/"$name" "$name"	
+	sudo arch-chroot /mnt usermod -l "$name" "$(logname)"	
+	sudo arch-chroot /mnt usermod -m -d /home/"$name" "$name"	
 	fi
 	sleep 1
     PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
@@ -662,19 +662,14 @@ setup_grub() {
 	local _mode _disk _offline
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
-	_offline=$(d_read offline)
-	if [ "$_offline" == "NO" ]; then
-	arch-chroot /mnt grub-install /dev/"$_disk"
-	arch-chroot /mnt update-grub
-	return 0;
-	elif [ "$_offline" == "YES" ] && [ "$_mode" == "bios" ]; then
-		arch-chroot /mnt apt-get install grub-pc -y 
-		arch-chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
-		arch-chroot /mnt update-grub >> /dev/null 2>&1
+	if [ "$_mode" == "bios" ]; then
+		sudo arch-chroot /mnt apt-get install grub-pc -y 
+		sudo arch-chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
+		sudo arch-chroot /mnt update-grub
 	else
-		arch-chroot /mnt apt-get install grub-efi-amd64 -y 
-		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
-		arch-chroot /mnt update-grub >> /dev/null 2>&1
+		sudo arch-chroot /mnt apt-get install grub-efi-amd64 -y 
+		sudo arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
+		sudo arch-chroot /mnt update-grub
 	fi
 	i="0"
         while (true)
