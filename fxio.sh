@@ -16,18 +16,22 @@
 
 
 CONF=${disk_conf:="/tmp/disk.conf"}
-d_conf () {
+
+d_conf() {
 	local _conf=$1 _value=$2
 	printf '%s\n' "${_conf}=${_value}" >> "$CONF"
 }
 d_conf
-d_read () {
+
+d_read() {
 	local _conf=$1
 	grep "${_conf}" "$CONF" | cut -d '=' -f2
 }
 d_read
 
-check_root () {if [ "$(id -u)" -ne 0 ]; then 
+check_root() {
+
+if [ "$(id -u)" -ne 0 ]; then 
 whiptail --title "Fluxuan-Installer" --msgbox "It appears that you are running this installer as user.
 
 Please run as ROOT (e. g.:  sudo bash fluxuan-installer) 
@@ -42,6 +46,7 @@ fi
 
 }
 check_root
+
 welcome_msg () {
 whiptail --title "Fluxuan-Installer" --msgbox "Welcome to Fluxuan Linux Installer.
 
@@ -53,7 +58,7 @@ https://Fluxuan.org - https://Forums.Fluxuan.org" 20 70
 
 }
 welcome_msg
-
+select_drive() {
 mode=$(whiptail --inputbox "Will you boot in bios or EFI mode (-- bios or EFI --)?
 ------------------------------------------------------" 20 70 bios --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 exitstatus=$?
@@ -78,7 +83,7 @@ partitioning() {
 local _disk _mode
 	_disk=$(d_read DISK)
 	_mode=$(d_read MODE)
-CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose one of the following options." 20 70 5 \
+	CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose one of the following options." 20 70 5 \
 	1 "Guided - use entire disk ( recomended for new users )" 3>&2 2>&1 1>&3  \
 	2 "Guided - separate boot partition" 3>&2 2>&1 1>&3  \
 	3 "Guided - separate boot and home partitions" 3>&2 2>&1 1>&3  \
@@ -484,7 +489,6 @@ setup_grub() {
 setup_grub
 
 finish() {
-	oldn=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
     reboot
