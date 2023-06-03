@@ -243,21 +243,9 @@ offline_inst () {
 {
 rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "rsync")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
+	for ((i=0; i<=100; i+=1)); do
+        sleep 3
+        echo "$i"
 } | whiptail --gauge "Offline install it might take a while, please wait...." 10 70 0
 }
 offline_inst
@@ -269,119 +257,19 @@ mk_swap () {
 	mount --bind /dev/ /mnt/dev/
 	mount --bind /proc/ /mnt/proc/
 	mount --bind /sys/ /mnt/sys/
-	bash -c 'genfstab -t LABEL /mnt >> /mnt/etc/fstab'
+	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
 	if [ "$_swap" == "YES" ]; then
 	chroot /mnt apt-get update
 	chroot /mnt apt-get install dphys-swapfile -y -qq
 	else
 	return 0;
 	fi
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "apt-get")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
 } | whiptail --gauge "Creating SWAP, it might take a while..." 10 70 0
 }
 mk_swap
-
-choose_init () {
-	CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose INIT system." 20 70 5 \
-	1 "Sysvinit" 3>&2 2>&1 1>&3  \
-	2 "OpenRC" 3>&2 2>&1 1>&3  \
-	3 "Runit" 3>&2 2>&1 1>&3 \
-
-)
-case $CHOICE in
-	1)
-	function sysvinit {
-	{
-	chroot /mnt apt-get install sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
-	  
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "apt-get")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
-
-} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
-	}
-	sysvinit
-	;;
-	
-	2)
-	function openrc {
-	{
-
-	  chroot /mnt apt-get install sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
-
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "apt-get")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
-} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
-	}
-	openrc
-	;;
-	
-	3)
-	function runit {
-	{
-
-	  chroot /mnt apt-get install sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
-
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "apt-get")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
-} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
-	}
-	runit
-	esac
-}
-choose_init
 
 set_hostname() {
 hostname=$(whiptail --inputbox "Input your desired hostname" 10 70 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
@@ -476,33 +364,13 @@ set_default_user
 
 setup_grub() {
 {
-	local _mode _disk
-	_mode=$(d_read MODE)
-	_disk=$(d_read DISK)
-	if [ "$_mode" == "bios" ]; then
-		  chroot /mnt apt-get install grub-pc -y 
-		  chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
-		  chroot /mnt update-grub
-	else
-		  chroot /mnt apt-get install grub-efi-amd64 -y 
-		  chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
-		  chroot /mnt update-grub
-	fi
-	i="0"
-        while (true)
-        do
-            proc=$(ps aux | grep -v grep | grep -e "update-grub")
-            if [[ "$proc" == "" ]]; then break; fi
-            # Sleep for a longer period if the database is really big 
-            # as dumping will take longer.
-            sleep 1
-            echo $i
-            i=$(expr $i + 1)
-        done
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
+
+	chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
+	chroot /mnt update-grub
+
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
 } | whiptail --gauge "Installing Grub please wait..." 6 70 0
 }
 setup_grub
