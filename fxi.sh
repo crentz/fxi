@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 #       @(#)Copyright (c) 2023 Petre C. Crentz
@@ -251,7 +250,7 @@ partitioning
 
 option_onoff () {
 
-if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to perform a Net-Install?\n\n -ATENTION- \n\nThis will use data and your internet connection.\nMore options will be available on choosing Net-In." 20 70); then
+if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to perform a Net-Install?\n\n -ATENTION- \n\nThis will use data and your internet connection.\nThank you for choosing Fluxuan." 20 70); then
     d_conf offline "YES"
 	else
 	return 0;
@@ -267,26 +266,23 @@ offline_inst () {
 	if [ "$_offline" == "YES" ]; then
 	choose_release
 	else
-	rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome"} / /mnt
+	rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	fi
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "rsync")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "rsync")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            i=(expr "$i" + 1)
-            echo 10
-            sleep 2
-            echo 30
-            echo "$i"
-           
-        
+            echo $i
+            i=$(expr $i + 1)
+        done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
-        
-        done
+        sleep 2
 } | whiptail --gauge "Offline install it might take a while, please wait...." 10 70 0
 }
 offline_inst
@@ -308,24 +304,21 @@ case $CHOICE in
 	deb-src http://deb.devuan.org/merged stable-security main contrib non-free
 	deb http://deb.devuan.org/merged stable-updates main contrib non-free
 	deb-src http://deb.devuan.org/merged stable-updates main contrib non-free" > /mnt/etc/apt/sources.list
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "debootstrap")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "10%"
-            sleep 2
-            echo "30%"
-            echo "$i"
-           
-        i=(expr "$i" + 1)
-     
+            echo $i
+            i=$(expr $i + 1)
+        done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-           done
 } | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
 	}
 	stdv
@@ -337,21 +330,21 @@ case $CHOICE in
 	/usr/sbin/debootstrap --variant=minbase testing /mnt http://pkgmaster.devuan.org/merged
 	printf '%s\n' "deb http://deb.devuan.org/merged testing main contrib non-free
 	deb-src http://deb.devuan.org/devuan testing main contrib non-free" > /mnt/etc/apt/sources.list
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "debootstrap")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
-
+            echo $i
+            i=$(expr $i + 1)
+        done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-           done
 } | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
 	}
 	stde
@@ -363,21 +356,21 @@ case $CHOICE in
 	/usr/sbin/debootstrap --variant=minbase unstable /mnt http://pkgmaster.devuan.org/merged
 	printf '%s\n' "deb http://deb.devuan.org/merged unstable main contrib non-free
 	deb-src http://deb.devuan.org/merged unstable main contrib non-free" > /mnt/etc/apt/sources.list
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "debootstrap")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
-   
+            echo $i
+            i=$(expr $i + 1)
+        done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-           done
 } | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
 	}
 	undv
@@ -387,12 +380,13 @@ case $CHOICE in
 
 mk_swap () {
 {
-	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
-	arch-chroot /mnt apt-get update
-	arch-chroot /mnt apt-get install locales -y
 	local _swap _offline
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
+	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
+	arch-chroot /mnt apt-get update
+	arch-chroot /mnt apt-get install locales -y
+	arch-chroot /mnt /usr/sbin/update-initramfs -u
 	if [ "$_swap" == "YES" ]; then
 	arch-chroot /mnt apt-get install dphys-swapfile -y
 	else
@@ -404,21 +398,21 @@ mk_swap () {
 	else
 	return 0;
 	fi
-	for ((i=0; i<=100; i+=1)); do
-        proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-
 } | whiptail --gauge "Creating SWAP, it might take a while..." 10 70 0
 }
 mk_swap
@@ -440,15 +434,16 @@ case $CHOICE in
 	else
 	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
 	fi
-	for ((i=0; i<=100; i+=1)); do
-        proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
@@ -469,21 +464,21 @@ case $CHOICE in
 	else
 	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-  
 } | whiptail --gauge "Installing init System, please be patient..." 10 70 0
 	}
 	openrc
@@ -498,15 +493,16 @@ case $CHOICE in
 	else
 	arch-chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
 	fi
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
@@ -521,6 +517,7 @@ choose_init
 
 install_packages () {
 {
+	
 	if [ -d "/home/$(logname)/.config/fxs" ]; then
 	arch_chroot /mnt xargs apt-get install -y ./home/"$(logname)"/.config/fxs/deb/*
 	else
@@ -531,15 +528,16 @@ install_packages () {
     else
     return 0 ;
 	fi
-	for ((i=0; i<=100; i+=1)); do
-       proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
@@ -583,7 +581,16 @@ timezone() {
 timezone
 
 locales() {
+local _offline
+	_offline=$(d_read offline)
+	if [ "$_offline" == "YES" ]; then
 	arch-chroot /mnt dpkg-reconfigure locales
+	else
+	arch-chroot /mnt apt-get update
+	arch-chroot /mnt /bin/bash export LC_ALL=C
+	arch-chroot /mnt apt-get install -f -y -qq
+	arch-chroot /mnt dpkg-reconfigure locales
+	fi
 }
 locales
 
@@ -629,8 +636,8 @@ set_default_user() {
 	chmod +x /mnt/etc/skel/.local/bin/*
 	else
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	arch-chroot /mnt usermod -l "$name" fluxuan	
-	arch-chroot /mnt usermod -m -d /home/"$name" "$name"	
+	arch-chroot /mnt /bin/bash usermod -l "$name" "$(logname)"	
+	arch-chroot /mnt /bin/bash usermod -m -d /home/"$name" "$name"	
 	fi
 	sleep 1
     PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
@@ -652,10 +659,15 @@ set_default_user
 
 setup_grub() {
 {
-	local _mode _disk
+	local _mode _disk _offline
 	_mode=$(d_read MODE)
 	_disk=$(d_read DISK)
-	if [ "$_mode" == "bios" ]; then
+	_offline=$(d_read offline)
+	if [ "$_offline" == "NO" ]; then
+	arch-chroot /mnt grub-install /dev/"$_disk"
+	arch-chroot /mnt update-grub
+	return 0;
+	elif [ "$_offline" == "YES" ] && [ "$_mode" == "bios" ]; then
 		arch-chroot /mnt apt-get install grub-pc -y 
 		arch-chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
 		arch-chroot /mnt update-grub >> /dev/null 2>&1
@@ -664,15 +676,16 @@ setup_grub() {
 		arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
 		arch-chroot /mnt update-grub >> /dev/null 2>&1
 	fi
-	for ((i=0; i<=100; i+=1)); do
- proc=$(pgrep -w "arch-chroot")
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "arch-chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
@@ -685,13 +698,13 @@ setup_grub
 finish() {
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
-	rm -rf "/home/$(logname)/.config/deb" ;
-	rm "/home/$(logname)/.config/*.pkgs" ;
+	rm -rf "/home/$(logname)/.config/fxs/deb" ;
+	rm "/home/$(logname)/.config/fxs/*.pkgs" ;
     shutdown -r now
 	else
     rm "$CONF" ;
-    rm -rf "/home/$(logname)/.config/deb" ;
-	rm "/home/$(logname)/.config/*.pkgs" ;
+    rm -rf "/home/$(logname)/.config/fxs/deb" ;
+	rm "/home/$(logname)/.config/fxs/*.pkgs" ;
     exit 0 ;
 	fi
 }
