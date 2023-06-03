@@ -384,9 +384,9 @@ mk_swap () {
 	local _swap _offline
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
-	mount --bind /dev/ /mnt/target/dev/
-	mount --bind /proc/ /mnt/target/proc/
-	mount --bind /sys/ /mnt/target/sys/
+	mount --bind /dev/ /mnt/dev/
+	mount --bind /proc/ /mnt/proc/
+	mount --bind /sys/ /mnt/sys/
 	bash -c 'genfstab -t LABEL /mnt >> /mnt/etc/fstab'
 	   chroot /mnt apt-get update
 	   chroot /mnt apt-get install locales -y
@@ -520,7 +520,7 @@ choose_init
 
 install_packages () {
 {
-	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	if [ -d "/home/$oldnam/.config/fxs" ]; then
 	  arch_chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
 	else
@@ -632,7 +632,7 @@ set_default_user() {
 	chmod +x /mnt/etc/skel/.local/bin/*
 	else
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
-	oldname=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+	oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	  chroot /mnt usermod -l "$name" "$oldname"	
 	  chroot /mnt usermod -d /home/"$name" -m "$name"	
 	fi
@@ -688,7 +688,7 @@ setup_grub() {
 setup_grub
 
 finish() {
-	oldn=$(awk -F: '/1000:1000/ { print $1 }' /target/etc/passwd)
+	oldn=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
 	rm -rf "/home/$oldn/.config/fxs/deb" ;
