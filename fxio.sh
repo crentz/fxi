@@ -243,9 +243,10 @@ offline_inst () {
 {
 rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	
-	for ((i=0; i<=100; i+=1)); do
-        sleep 3
+for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
         echo "$i"
+    done
 } | whiptail --gauge "Offline install it might take a while, please wait...." 10 70 0
 }
 offline_inst
@@ -264,9 +265,10 @@ mk_swap () {
 	else
 	return 0;
 	fi
-	for ((i=0; i<=100; i+=1)); do
+for ((i=0; i<=100; i+=1)); do
         sleep 0.1
         echo "$i"
+    done
 } | whiptail --gauge "Creating SWAP, it might take a while..." 10 70 0
 }
 mk_swap
@@ -368,9 +370,10 @@ setup_grub() {
 	chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
 	chroot /mnt update-grub
 
-	for ((i=0; i<=100; i+=1)); do
+for ((i=0; i<=100; i+=1)); do
         sleep 0.1
         echo "$i"
+    done
 } | whiptail --gauge "Installing Grub please wait..." 6 70 0
 }
 setup_grub
