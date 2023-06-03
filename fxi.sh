@@ -266,7 +266,7 @@ offline_inst () {
 	if [ "$_offline" == "YES" ]; then
 	choose_release
 	else
-	  rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	fi
 	i="0"
         while (true)
@@ -404,7 +404,7 @@ mk_swap () {
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e " chroot")
+            proc=$(ps aux | grep -v grep | grep -e "chroot")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -522,12 +522,12 @@ install_packages () {
 {
 	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	if [ -d "/home/$oldnam/.config/fxs" ]; then
-	  arch_chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
+	  chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
 	else
 	return 0 ;
 	fi
 	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
-      arch_chroot /mnt xargs apt-get install -y </home/"$oldnam"/.config/fxs/*.pkgs
+      chroot /mnt xargs apt-get install -y </home/"$oldnam"/.config/fxs/*.pkgs
     else
     return 0 ;
 	fi
