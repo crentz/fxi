@@ -266,7 +266,7 @@ offline_inst () {
 	if [ "$_offline" == "YES" ]; then
 	choose_release
 	else
-	rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+	sudo rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
 	fi
 	i="0"
         while (true)
@@ -383,7 +383,7 @@ mk_swap () {
 	local _swap _offline
 	_swap=$(d_read SWAP)
 	_offline=$(d_read offline)
-	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
+	sudo arch-chroot genfstab -U -p /mnt >> /mnt/etc/fstab'
 	sudo arch-chroot /mnt apt-get update
 	sudo arch-chroot /mnt apt-get install locales -y
 	sudo arch-chroot /mnt /usr/sbin/update-initramfs -u
