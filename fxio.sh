@@ -74,7 +74,6 @@ If I can help in any way please do not hesitate to ask on our Forums!
 
 https://fluxuan.org     https://forums.fluxuan.org" 20 70
 	rm "$CONF"
-	clear ;
     exit 1 ;
 fi
 
@@ -85,7 +84,6 @@ if [ $exitstatus = 0 ]; then
     d_conf MODE "$mode"
 else
 	rm "$CONF"
-	clear ;
     exit 1 ;
 fi
 }
@@ -128,11 +126,7 @@ local _disk _mode
 	fi
 		partx -u /dev/"$_disk"
 		mount /dev/"$_disk"1 /mnt
-	if [ "$_mode" == "bios" ]; then
-		mkdir -p /mnt/boot
-	else
-		mkdir -p /mnt/boot/efi
-	fi
+
 	for ((i=0; i<=100; i+=1)); do
         sleep 0.1
         echo "$i"
@@ -204,7 +198,6 @@ If I can help in any way please do not hesitate to ask on our Forums!
 
 https://fluxuan.org     https://forums.fluxuan.org" 20 70
 	rm "$CONF"
-	clear ;
     exit 1 ;
 fi
 	
@@ -241,7 +234,8 @@ partitioning
 
 offline_inst () {
 {
-rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+#rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/#device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/#*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+cp -ax / /mnt
 	
 for ((i=0; i<=100; i+=1)); do
         sleep 0.1
@@ -255,9 +249,11 @@ mk_swap () {
 {
 	local _swap
 	_swap=$(d_read SWAP)
-	mount --bind /dev/ /mnt/dev/
-	mount --bind /proc/ /mnt/proc/
-	mount --bind /sys/ /mnt/sys/
+	mount --bind /dev /mnt/dev
+	mount --bind /dev/pts /mnt/dev/pts
+	mount --bind /proc /mnt/proc
+	mount --bind /sys /mnt/sys
+	mount --bind /run /mnt/run
 	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
 	if [ "$_swap" == "YES" ]; then
 	chroot /mnt apt-get update
@@ -294,7 +290,6 @@ If I can help in any way please do not hesitate to ask on our Forums!
 
 https://fluxuan.org     https://forums.fluxuan.org" 20 70
 	rm "$CONF"
-	clear ;
     exit 1 ;
 fi
 }
@@ -333,7 +328,6 @@ If I can help in any way please do not hesitate to ask on our Forums!
 
 https://fluxuan.org     https://forums.fluxuan.org" 20 70
 	rm "$CONF"
-	clear ;
     exit 1 ;
 fi
 }
@@ -344,7 +338,15 @@ set_default_user() {
 	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 	
 	chroot /mnt usermod -l "$name" "$oldname"
+	chroot /mnt groupmod -n "$name" "$oldname"
 	chroot /mnt usermod -d /home/"$name" -m "$name"
+	for i in $(grep -r "/home/$oldname" /mnt/home/"$name"/.config | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$name/g" "$i"
+	done
+
+	for i in $(grep -r "/home/$oldname" /mnt/home/"$name"/.local | awk -F":" '{ print $1 }'); do
+	sed -i "s/\/home\/$oldname/\/home\/$name/g" "$i"
+	done
 	sleep 1
 	
     PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
@@ -358,7 +360,6 @@ If I can help in any way please do not hesitate to ask on our Forums!
 
 https://fluxuan.org     https://forums.fluxuan.org" 20 70
 	rm "$CONF"
-	clear ;
     exit 1 ;
     fi
 }
@@ -368,7 +369,7 @@ setup_grub() {
 {
 
 	chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
-	chroot /mnt update-grub
+	chroot /mnt update-grub >> /dev/null 2>&1
 
 for ((i=0; i<=100; i+=1)); do
         sleep 0.1
