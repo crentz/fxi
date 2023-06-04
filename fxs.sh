@@ -126,32 +126,6 @@ for ((i=0; i<=100; i+=1)); do
         sleep 2
 } | whiptail --gauge "Preparing Filesystems...." 6 60 0
 }
-touch_boot () {
- {
-touch /home/fxs/staging/isolinux/isolinux.cfg
-touch /home/fxs/staging/boot/grub/grub.cfg
-touch /home/fxs/tmp/grub-embed.cfg
- for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Preparing Boot Files...." 6 60 0
-}
-copy_boot () {
-{
-printf "" > /home/fxs/chroot/etc/fstab
-cp /home/fxs/chroot/boot/vmlinuz-* /home/fxs/staging/live/vmlinuz
-cp /home/fxs/chroot/boot/initrd.img-* /home/fxs/staging/live/initrd
-cp /home/fxs/staging/boot/grub/grub.cfg /home/fxs/staging/EFI/BOOT/
-cp /usr/lib/ISOLINUX/isolinux.bin /home/fxs/staging/isolinux/
-cp /usr/lib/syslinux/modules/bios/* /home/fxs/staging/isolinux/
-cp -r /usr/lib/grub/x86_64-efi/* /home/fxs/staging/boot/grub/x86_64-efi/
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Copying Boot Files...." 6 60 0
-}
 
 set_hostname() {
 {
@@ -172,6 +146,78 @@ for ((i=0; i<=100; i+=1)); do
     done
 } | whiptail --gauge "Setting your hostname...." 6 60 0
 }
+
+make_change () {
+mount --bind /proc /home/fxs/chroot/proc
+mount --bind /sys /home/fxs/chroot/sys
+mount --bind /dev /home/fxs/chroot/dev
+export HOME=/root
+export LC_ALL=C
+whiptail --title "Make Changes" --msgbox "Your Operating System is ready for changes.
+If you want to make any changes head to: 
+-> /home/fxs/chroot <-
+If you want a boot splash just add one to 
+-> /home/fxs/staging/boot/splash.png <-
+
+https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65 ;
+
+}
+
+chroot_OS () {
+if (whiptail --title "Chroot System" --yesno "Do you want to chroot into your system and install remove programs?" 8 78); then
+chroot /home/fxs/chroot /bin/bash
+else
+return 0;
+fi
+}
+
+squashing_filesystem () {
+{
+umount /home/fxs/chroot/proc
+umount /home/fxs/chroot/sys
+umount /home/fxs/chroot/dev
+export HISTSIZE=0
+mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -b 1048576 -comp xz -e boot &
+for ((i=0; i<=100; i+=1)); do   
+            sleep 20
+            echo "$i"
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+        done
+} | whiptail --gauge "Squashing Filesystems, it might take some time...." 6 60 0
+}
+
+touch_boot () {
+ {
+touch /home/fxs/staging/isolinux/isolinux.cfg
+touch /home/fxs/staging/boot/grub/grub.cfg
+touch /home/fxs/tmp/grub-embed.cfg
+ for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Preparing Boot Files...." 6 60 0
+}
+
+copy_boot () {
+{
+printf "" > /home/fxs/chroot/etc/fstab
+cp /home/fxs/chroot/boot/vmlinuz-* /home/fxs/staging/live/vmlinuz
+cp /home/fxs/chroot/boot/initrd.img-* /home/fxs/staging/live/initrd
+cp /home/fxs/staging/boot/grub/grub.cfg /home/fxs/staging/EFI/BOOT/
+cp /usr/lib/ISOLINUX/isolinux.bin /home/fxs/staging/isolinux/
+cp /usr/lib/syslinux/modules/bios/* /home/fxs/staging/isolinux/
+cp -r /usr/lib/grub/x86_64-efi/* /home/fxs/staging/boot/grub/x86_64-efi/
+for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Copying Boot Files...." 6 60 0
+}
+
+
 print_menu () {
 {
 local _ISONAME _LABEL
@@ -244,49 +290,7 @@ for ((i=0; i<=100; i+=1)); do
 
 }
 
-make_change () {
-mount --bind /proc /home/fxs/chroot/proc
-mount --bind /sys /home/fxs/chroot/sys
-mount --bind /dev /home/fxs/chroot/dev
-export HOME=/root
-export LC_ALL=C
-whiptail --title "Make Changes" --msgbox "Your Operating System is ready for changes.
-If you want to make any changes head to: 
--> /home/fxs/chroot <-
-If you want a boot splash just add one to 
--> /home/fxs/staging/boot/splash.png <-
 
-https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65 ;
-
-}
-
-chroot_OS () {
-if (whiptail --title "Chroot System" --yesno "Do you want to chroot into your system and install remove programs?" 8 78); then
-chroot /home/fxs/chroot /bin/bash
-else
-return 0;
-fi
-}
-
-
-
-squashing_filesystem () {
-{
-umount /home/fxs/chroot/proc
-umount /home/fxs/chroot/sys
-umount /home/fxs/chroot/dev
-export HISTSIZE=0
-mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -b 1048576 -comp xz -e boot &
-for ((i=0; i<=100; i+=1)); do   
-            sleep 20
-            echo "$i"
-        # If it is done then display 100%
-        echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
-        done
-} | whiptail --gauge "Squashing Filesystems, it might take some time...." 6 60 0
-}
 
 write_grub () {
 {
@@ -337,13 +341,13 @@ do_install () {
 	install_dep
 	create_folders
 	get_system
-	touch_boot
-	copy_boot
 	set_hostname
-	print_menu
 	make_change
 	chroot_OS
 	squashing_filesystem
+	touch_boot
+	copy_boot
+	print_menu
 	write_grub
 	build_iso
 	finish
