@@ -1,356 +1,704 @@
 #!/bin/bash
 
 #       @(#)Copyright (c) 2023 Petre C. Crentz
-#
+#		( crentzc@gmail.com )
 #       This file is provided in the hope that it will
 #       be of use.  There is absolutely NO WARRANTY.
 #       Permission to copy, redistribute or otherwise
 #       use this file is hereby granted provided that
-#       the above copyright notice and this notice are
-#       left intact.
+#       the this notice is to be left intact.
+#       You may modify in any way but you have to mention
 #
-#		Fluxuan Linux Snapshot Tool
-#	
+#		Fluxuan Linux 
+#		in the begining thank you, for any help, 
 #		https://fluxuan.org - https://forums.fluxuan.org
 #		Thank you for your interest in Fluxuan Linux !!
 
-conf=${disk_conf:="/tmp/disk.conf"}
-d_conf() {
-# writing to disk.txt
+
+CONF=${disk_conf:="/tmp/disk.conf"}
+d_conf () {
 	local _conf=$1 _value=$2
-	printf '%s\n' "${_conf}=${_value}" >> "$conf"
-	
+	printf '%s\n' "${_conf}=${_value}" >> "$CONF"
 }
-d_read() {
-# reading from disk.txt
+d_conf
+d_read () {
 	local _conf=$1
-	grep "${_conf}" "$conf" | cut -d '=' -f2
+	grep "${_conf}" "$CONF" | cut -d '=' -f2
 }
-check_root (){
-# check if running as root
-[[ $(id -u) -eq 0 ]] || { echo -e "\t You need to be root!\n" ; exit 1 ; }
+d_read
+
+check_root () {
+if [ "$(id -u)" -ne 0 ]; then 
+whiptail --title "Fluxuan-Installer" --msgbox "It appears that you are running this installer as user.
+
+Please run as ROOT (e. g.:  sudo bash fluxuan-installer) 
+-------------------------------------------------------
+Thank you for your interest in Fluxuan Linux.
+
+https://Fluxuan.org - https://Forums.Fluxuan.org" 20 70 ;
+exit 1; 
+else
+	return 1;
+fi
+
 }
-
-
+check_root
 welcome_msg () {
-whiptail --title "Fluxuan-Snapshot" --msgbox "Welcome to Fluxuan-Snapshot utility.
-Fluxuan-Snapshot will create a bootable ISO Snapshot.
-Fluxuan-Installer is included so you can restore.
-Thank you for your interest in Fluxuan Linux. 
+whiptail --title "Fluxuan-Installer" --msgbox "Welcome to Fluxuan Linux Installer.
 
-https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65
+This installer will guide you to the rest of the setup process.
+--------------------------------------------------------------
+Thank you for your interest in Fluxuan Linux.
+
+https://Fluxuan.org - https://Forums.Fluxuan.org" 20 70
 
 }
+welcome_msg
+check_connection () {
+clear ;
+echo "Checking for internet connection, please wait..." ;
+wget -q --spider http://google.com >/dev/null 2>&1
+net=$?
+if [ "$net" -eq 0 ]; then
+    return 0;
+else
+    whiptail --title "Fluxuan-Installer" --msgbox "It appears that you are not connected to a network.\nConnect to a network after pressing OK / ENTER." 20 70
+nmtui
+fi
+}
+check_connection
+select_drive() {
 
-ask_part () {
+disk=$(whiptail --inputbox "Choose one of your available devices (e.g. sdX):
+------------------------------------------------
 
-hostname=$(whiptail --inputbox "Input your desired hostname" 8 78 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
+$(lsblk -n --output TYPE,NAME,SIZE,MODEL | awk '$1=="disk"{print i++,"->",$2,$3,$4}')" 20 70 sdX --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
-    d_conf HOSTNAME "$hostname"
+    d_conf DISK "$disk"
 else
-    rm "$conf" ;
+ whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
+
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
     exit 1 ;
 fi
 
-
-ISONAME=$(whiptail --inputbox "Input your desired ISONAME" 8 78 Fluxuan-Linux --title "Configuration..." 3>&1 1>&2 2>&3)
+mode=$(whiptail --inputbox "Will you boot in bios or EFI mode (-- bios or EFI --)?
+------------------------------------------------------" 20 70 bios --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
 exitstatus=$?
 if [ $exitstatus = 0 ]; then
-    d_conf ISONAME "$ISONAME"
+    d_conf MODE "$mode"
 else
-    rm "$conf" ;
-     exit 1 ;
-fi
-
-
-
-LABEL=$(whiptail --inputbox "Input your desired disk LABEL" 8 78 Fluxuan-Linux --title "Configuration..." 3>&1 1>&2 2>&3)
-exitstatus=$?
-if [ $exitstatus = 0 ]; then
-    d_conf LABEL "$LABEL"
-else
-    rm "$conf" ;
-     exit 1 ;
+	rm "$CONF"
+	clear ;
+    exit 1 ;
 fi
 }
+select_drive
+create_swap() {
+if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to use SWAP?" 20 70); then
+	d_conf SWAP "YES"
+	else
+  	return 0;
+	fi
+}
+create_swap
+partitioning() {
+local _disk _mode
+	_disk=$(d_read DISK)
+	_mode=$(d_read MODE)
+CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose one of the following options." 20 70 5 \
+	1 "Guided - use entire disk ( recomended for new users )" 3>&2 2>&1 1>&3  \
+	2 "Guided - separate boot partition" 3>&2 2>&1 1>&3  \
+	3 "Guided - separate boot and home partitions" 3>&2 2>&1 1>&3  \
+)
+	case $CHOICE in
 
-install_dep () {
- {
-apt-get update && apt-get install rsync live-boot debootstrap squashfs-tools xorriso isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin grub-efi-ia32-bin mtools dosfstools resolvconf arch-install-scripts -y -qq &
+	1)
+	function one {
+	{
+	if [ "$_mode" == "bios" ]; then
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100%
+		parted -s /dev/"$_disk" set 1 boot on 
+	else
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100%
+		parted -s /dev/"$_disk" set 1 boot on
+	fi	
+	if [ "$_mode" == "bios" ]; then
+		mkfs.ext4 /dev/"$_disk"1 >> /dev/null 2>&1
+	else
+		mkfs.ext4 /dev/"$_disk"1 >> /dev/null 2>&1
+	fi
+		partx -u /dev/"$_disk"
+		mount /dev/"$_disk"1 /mnt
+	if [ "$_mode" == "bios" ]; then
+		mkdir -p /mnt/boot
+	else
+		mkdir -p /mnt/boot/efi
+	fi
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Partitioning your drive please wait..." 10 70 0
+	}
+	one
+	;;
+	
+	2)
+	function two {
+	{
+	if [ "$_mode" == "bios" ]; then
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100MB
+		parted -s /dev/"$_disk" set 1 boot on 
+	else
+		parted -s /dev/"$_disk" mklabel gpt
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100MB
+		parted -s /dev/"$_disk" set 1 ESP on
+	fi	
+	parted -s /dev/"$_disk" mkpart primary ext2 100MB 100%
+	mkfs.ext4 /dev/"$_disk"2 >> /dev/null 2>&1
+	if [ "$_mode" == "bios" ]; then
+		mkfs.ext4 /dev/"$_disk"1 >> /dev/null 2>&1
+	else
+		mkfs.fat -F 32 /dev/"$_disk"1 >> /dev/null 2>&1
+	fi
+		partx -u /dev/"$_disk"
+		mount /dev/"$_disk"2 /mnt
+	if [ "$_mode" == "bios" ]; then
+		mkdir -p /mnt/boot
+		mount /dev/"$_disk"1 /mnt/boot
+	else
+		mkdir -p /mnt/boot/efi
+		mount /dev/"$_disk"1 /mnt/boot/efi
+	fi
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Partitioning your drive please wait..." 10 70 0
+	}
+	two
+	;;
+	
+	3)
+	function three {
+	{	
+	if [ "$_mode" == "bios" ]; then
+		parted -s /dev/"$_disk" mklabel msdos
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100MB
+		parted -s /dev/"$_disk" set 1 boot on 
+	else
+		parted -s /dev/"$_disk" mklabel gpt
+		parted -s /dev/"$_disk" mkpart primary ext2 1 100MB
+		parted -s /dev/"$_disk" set 1 ESP on
+	fi	
+	rsize=$(whiptail --inputbox "Size of your ROOT Partition (ex. 40GB)?\nThe rest of the drive will be HOME Partition.\n
+------------------------------------------------------" 20 70 30GB --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    parted -s /dev/"$_disk" mkpart primary ext2 100MB "$rsize"
+    parted -s /dev/"$_disk" mkpart primary ext2 "$rsize" 100%
+else
+	whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
 
-for ((i=0; i<=100; i+=1)); do
-        proc=$(pgrep -w "apt-get")
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
+    exit 1 ;
+fi
+	
+	if [ "$_mode" == "bios" ]; then
+		mkfs.ext4 /dev/"$_disk"1 >> /dev/null 2>&1
+	else
+		mkfs.fat -F 32 /dev/"$_disk"1 >> /dev/null 2>&1
+	fi
+	mkfs.ext4 /dev/"$_disk"2 >> /dev/null 2>&1
+	mkfs.ext4 /dev/"$_disk"3 >> /dev/null 2>&1
+		partx -u /dev/"$_disk"
+		mount /dev/"$_disk"2 /mnt
+		if [ "$_mode" == "bios" ]; then
+		mkdir -p /mnt/boot
+		mount /dev/"$_disk"1 /mnt/boot
+	else
+		mkdir -p /mnt/boot/efi
+		mount /dev/"$_disk"1 /mnt/boot/efi
+	fi
+	mkdir -p /mnt/home
+	mount /dev/"$_disk"3 /mnt/home
+	for ((i=0; i<=100; i+=1)); do
+        sleep 0.1
+        echo "$i"
+    done
+} | whiptail --gauge "Partitioning your drive please wait..." 10 70 0
+	}
+	three
+	;;
+esac
+
+}
+partitioning
+
+option_onoff () {
+
+if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to perform a Net-Install?\n\n -ATENTION- \n\nThis will use data and your internet connection.\nThank you for choosing Fluxuan." 20 70); then
+    d_conf offline "YES"
+	else
+	return 0;
+	fi
+
+
+}
+option_onoff
+offline_inst () {
+{
+	local _offline
+	_offline=$(d_read offline)
+	if [ "$_offline" == "YES" ]; then
+	choose_release
+	else
+rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/run/*","/tmp/*","/swapfile","/cdrom/*","/target","/live","/boot/grub/grub.cfg","/boot/grub/menu.lst","/boot/grub/device.map","/etc/udev/rules.d/70-persisten-cd.rules","/etc/udev/rules.d/70-persistent-net.rules","/etc/fstab","/etc/mtab","/home/snapshot","/home/fxs","/home/*/.gvfs","/mnt/*","/media/*","/lost+found","/usr/bin/welcome","/var/swapfile"} / /mnt
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "rsync")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
             sleep 1
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-} | whiptail --gauge "Installing Dependencies..." 6 60 0
+} | whiptail --gauge "Offline install it might take a while, please wait...." 10 70 0
 }
+offline_inst
+choose_release() {
+CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose one of the following options." 20 70 5 \
+	1 "Fluxuan - Stable (based on Devuan Chimaera)" 3>&2 2>&1 1>&3  \
+	2 "Fluxuan - Testing (based on Devuan Daedalus)" 3>&2 2>&1 1>&3  \
+	3 "Fluxuan - Unstable (based on Devuan Ceres)" 3>&2 2>&1 1>&3 \
 
-create_folders () {
-{
-mkdir -p /home/fxs /home/fxs/chroot
-mkdir -p /home/fxs/{staging/{EFI/BOOT,boot/grub/x86_64-efi,isolinux,live},tmp} 
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Creating Folders..." 6 60 0
-}
-
-get_system () {
-{
-rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/home/fxs","/home/snapshot"} / /home/fxs/chroot
-for ((i=0; i<=100; i+=1)); do
-        proc=$(pgrep -w "rsync")
+)
+case $CHOICE in
+	1)
+	function stdv {
+	{
+	/usr/sbin/debootstrap --variant=minbase stable /mnt http://pkgmaster.devuan.org/merged
+	printf '%s\n' "deb http://deb.devuan.org/merged stable main contrib non-free
+	deb-src http://deb.devuan.org/merged stable main contrib non-free
+	deb http://deb.devuan.org/merged stable-security main contrib non-free
+	deb-src http://deb.devuan.org/merged stable-security main contrib non-free
+	deb http://deb.devuan.org/merged stable-updates main contrib non-free
+	deb-src http://deb.devuan.org/merged stable-updates main contrib non-free" > /mnt/etc/apt/sources.list
+	
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
-            sleep 10
-            echo "$i"
-           
-        i=(expr "$i" + 1)
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
         done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-} | whiptail --gauge "Preparing Filesystems...." 6 60 0
+} | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
+	}
+	stdv
+	;;
+	
+	2)
+	function stde {
+	{
+	/usr/sbin/debootstrap --variant=minbase testing /mnt http://pkgmaster.devuan.org/merged
+	printf '%s\n' "deb http://deb.devuan.org/merged testing main contrib non-free
+	deb-src http://deb.devuan.org/devuan testing main contrib non-free" > /mnt/etc/apt/sources.list
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
+	}
+	stde
+	;;
+	
+	3)
+	function undv {
+	{
+	/usr/sbin/debootstrap --variant=minbase unstable /mnt http://pkgmaster.devuan.org/merged
+	printf '%s\n' "deb http://deb.devuan.org/merged unstable main contrib non-free
+	deb-src http://deb.devuan.org/merged unstable main contrib non-free" > /mnt/etc/apt/sources.list
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Performing Net Install, please wait it might take a while..." 10 70 0
+	}
+	undv
+	esac
+	
 }
 
-set_hostname() {
+mk_swap () {
 {
-local _hostname
-	_hostname=$(d_read HOSTNAME)
-	echo "$_hostname" > /home/fxs/chroot/etc/hostname
-	cat <<EOF > /home/fxs/chroot/hosts
+	local _swap _offline
+	_swap=$(d_read SWAP)
+	_offline=$(d_read offline)
+	mount --bind /dev/ /mnt/dev/
+	mount --bind /proc/ /mnt/proc/
+	mount --bind /sys/ /mnt/sys/
+	bash -c 'genfstab -t LABEL /mnt >> /mnt/etc/fstab'
+	   chroot /mnt apt-get update
+	   chroot /mnt apt-get install locales -y
+	if [ "$_swap" == "YES" ]; then
+	   chroot /mnt apt-get install dphys-swapfile -y
+	else
+	return 0;
+	fi
+	if [ "$_offline" == "YES" ]; then
+	mkdir -p /mnt/etc/network/
+	cp /etc/network/interfaces /mnt/etc/network/interfaces
+	else
+	return 0;
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "chroot")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Creating SWAP, it might take a while..." 10 70 0
+}
+mk_swap
+
+choose_init () {
+	CHOICE=$(whiptail --title Fluxuan-Installer --menu "Choose INIT system." 20 70 5 \
+	1 "Sysvinit" 3>&2 2>&1 1>&3  \
+	2 "OpenRC" 3>&2 2>&1 1>&3  \
+	3 "Runit" 3>&2 2>&1 1>&3 \
+
+)
+case $CHOICE in
+	1)
+	function sysvinit {
+	{
+	if [ "$(getconf LONG_BIT)" = "64" ]
+	then
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	else
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core elogind libpam-elogind orphan-sysvinit-scripts systemctl -y
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+
+} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
+	}
+	sysvinit
+	;;
+	
+	2)
+	function openrc {
+	{
+	if [ "$(getconf LONG_BIT)" = "64" ]
+	then
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	else
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core openrc elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
+	}
+	openrc
+	;;
+	
+	3)
+	function runit {
+	{
+	if [ "$(getconf LONG_BIT)" = "64" ]
+	then
+	  chroot /mnt apt-get install linux-image-amd64 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	else
+	  chroot /mnt apt-get install linux-image-686 sysvinit-core runit elogind libpam-elogind orphan-sysvinit-scripts systemctl procps -y
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Installing init System, please be patient..." 10 70 0
+	}
+	runit
+	esac
+}
+choose_init
+
+install_packages () {
+{
+	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
+	if [ -d "/home/$oldnam/.config/fxs" ]; then
+	  chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
+	else
+	return 0 ;
+	fi
+	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
+      chroot /mnt xargs apt-get install -y </home/"$oldnam"/.config/fxs/*.pkgs
+    else
+    return 0 ;
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
+        # If it is done then display 100%
+        echo 100
+        # Give it some time to display the progress to the user.
+        sleep 2
+} | whiptail --gauge "Installing Packages, please wait..." 10 70 0
+}
+install_packages
+
+set_hostname() {
+hostname=$(whiptail --inputbox "Input your desired hostname" 10 70 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    d_conf HOSTNAME "$hostname"
+    echo "$hostname" > /mnt/etc/hostname
+	cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
-127.0.1.1	$_hostname
+127.0.1.1	$hostname
 # The following lines are desirable for IPv6 capable hosts
 ::1     localhost ip6-localhost ip6-loopback
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Setting your hostname...." 6 60 0
-}
-
-make_change () {
-mount --bind /proc /home/fxs/chroot/proc
-mount --bind /sys /home/fxs/chroot/sys
-mount --bind /dev /home/fxs/chroot/dev
-export HOME=/root
-export LC_ALL=C
-whiptail --title "Make Changes" --msgbox "Your Operating System is ready for changes.
-If you want to make any changes head to: 
--> /home/fxs/chroot <-
-If you want a boot splash just add one to 
--> /home/fxs/staging/boot/splash.png <-
-
-https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65 ;
-
-}
-
-chroot_OS () {
-if (whiptail --title "Chroot System" --yesno "Do you want to chroot into your system and install remove programs?" 8 78); then
-chroot /home/fxs/chroot /bin/bash
 else
-return 0;
+whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
+
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
+    exit 1 ;
 fi
 }
+set_hostname
 
-squashing_filesystem () {
+timezone() {
+	  chroot /mnt dpkg-reconfigure tzdata
+	
+}
+timezone
+
+locales() {
+
+	  chroot /mnt dpkg-reconfigure locales
+
+}
+locales
+
+xkb_cons() {
+	local _offline
+	_offline=$(d_read offline)
+	if [ "$_offline" == "YES" ]; then
+	  chroot /mnt apt install console-setup keyboard-configuration -y
+	else
+	  chroot /mnt dpkg-reconfigure keyboard-configuration
+	fi
+}
+xkb_cons
+
+set_pass() {
+PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your ROOT Password." 10 70 3>&1 1>&2 2>&3)
+PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 70 3>&1 1>&2 2>&3)
+
+if [[ "$PASSWD" == "$PASSWD_CHECK" ]]; then
+	echo -e "$PASSWD\n$PASSWD" | passwd root
+else
+	whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
+
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
+    exit 1 ;
+fi
+}
+set_pass
+
+set_default_user() {
+	local _offline
+	_offline=$(d_read offline)
+	if [ "$_offline" == "YES" ]; then
+	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+	  chroot /mnt useradd -m "$name"
+	  chroot /mnt usermod -aG cdrom,floppy,audio,dip,video,plugdev,netdev,sudo "$name"
+	  chroot /mnt usermod -s /bin/bash "$name"
+	cp -r /etc/skel /mnt/etc/
+	chmod +x /mnt/etc/skel/.local/bin/*
+	else
+	name=$(whiptail --inputbox "Create default USERNAME:" 10 70 fluxuan --title "Fluxuan-Installer" 3>&1 1>&2 2>&3)
+	oldname=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
+	  chroot /mnt usermod -l "$name" "$oldname"	
+	  chroot /mnt usermod -d /home/"$name" -m "$name"	
+	fi
+	sleep 1
+    PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
+	PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password " 10 70 3>&1 1>&2 2>&3)
+	if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
+	echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$name"
+	else
+	whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
+ 
+If I can help in any way please do not hesitate to ask on our Forums!
+
+https://fluxuan.org     https://forums.fluxuan.org" 20 70
+	rm "$CONF"
+	clear ;
+    exit 1 ;
+    fi
+}
+set_default_user
+
+setup_grub() {
 {
-umount /home/fxs/chroot/proc
-umount /home/fxs/chroot/sys
-umount /home/fxs/chroot/dev
-export HISTSIZE=0
-mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -b 1048576 -comp xz -e boot &
-for ((i=0; i<=100; i+=1)); do   
-            sleep 20
-            echo "$i"
+	local _mode _disk _offline
+	_mode=$(d_read MODE)
+	_disk=$(d_read DISK)
+	if [ "$_mode" == "bios" ]; then
+		  chroot /mnt apt-get install grub-pc -y 
+		  chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
+		  chroot /mnt update-grub
+	else
+		  chroot /mnt apt-get install grub-efi-amd64 -y 
+		  chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
+		  chroot /mnt update-grub
+	fi
+	i="0"
+        while (true)
+        do
+            proc=$(ps aux | grep -v grep | grep -e "update-grub")
+            if [[ "$proc" == "" ]]; then break; fi
+            # Sleep for a longer period if the database is really big 
+            # as dumping will take longer.
+            sleep 1
+            echo $i
+            i=$(expr $i + 1)
+        done
         # If it is done then display 100%
         echo 100
         # Give it some time to display the progress to the user.
         sleep 2
-        done
-} | whiptail --gauge "Squashing Filesystems, it might take some time...." 6 60 0
+} | whiptail --gauge "Installing Grub please wait..." 6 70 0
 }
+setup_grub
 
-touch_boot () {
- {
-touch /home/fxs/staging/isolinux/isolinux.cfg
-touch /home/fxs/staging/boot/grub/grub.cfg
-touch /home/fxs/tmp/grub-embed.cfg
- for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Preparing Boot Files...." 6 60 0
+finish() {
+	oldn=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
+	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
+	rm "$CONF" ;
+	rm -rf "/home/$oldn/.config/fxs/deb" ;
+	rm "/home/$oldn/.config/fxs/*.pkgs" ;
+    shutdown -r now
+	else
+    rm "$CONF" ;
+    rm -rf "/home/$oldn/.config/fxs/deb" ;
+	rm "/home/$oldn/.config/fxs/*.pkgs" ;
+    exit 0 ;
+	fi
 }
-
-copy_boot () {
-{
-printf "" > /home/fxs/chroot/etc/fstab
-cp /home/fxs/chroot/boot/vmlinuz-* /home/fxs/staging/live/vmlinuz
-cp /home/fxs/chroot/boot/initrd.img-* /home/fxs/staging/live/initrd
-cp /home/fxs/staging/boot/grub/grub.cfg /home/fxs/staging/EFI/BOOT/
-cp /usr/lib/ISOLINUX/isolinux.bin /home/fxs/staging/isolinux/
-cp /usr/lib/syslinux/modules/bios/* /home/fxs/staging/isolinux/
-cp -r /usr/lib/grub/x86_64-efi/* /home/fxs/staging/boot/grub/x86_64-efi/
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Copying Boot Files...." 6 60 0
-}
-
-
-print_menu () {
-{
-local _ISONAME _LABEL
-	_ISONAME=$(d_read ISONAME)
-	_LABEL=$(d_read LABEL)
-printf "UI vesamenu.c32\n
-\n
-MENU TITLE $_ISONAME\n
-DEFAULT linux\n
-TIMEOUT 600\n
-MENU RESOLUTION 640 480\n
-MENU COLOR border       30;44   #40ffffff #a0000000 std\n
-MENU COLOR title        1;36;44 #9033ccff #a0000000 std\n
-MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all\n
-MENU COLOR unsel        37;44   #50ffffff #a0000000 std\n
-MENU COLOR help         37;40   #c0ffffff #a0000000 std\n
-MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std\n
-MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std\n
-MENU COLOR msg07        37;40   #90ffffff #a0000000 std\n
-MENU COLOR tabmsg       31;40   #30ffffff #00000000 std\n
-MENU BACKGROUND /boot/splash.png\n
-\n
-LABEL linux\n   
-MENU LABEL $_ISONAME\n
-MENU DEFAULT\n  
-KERNEL /live/vmlinuz\n   
-APPEND initrd=/live/initrd boot=live\n\n   
-$_LABEL\n   
-MENU LABEL $_ISONAME\n   
-MENU DEFAULT\n
-KERNEL /live/vmlinuz\n
-APPEND initrd=/live/initrd boot=live nomodeset\n
-EOF" > /home/fxs/staging/isolinux/isolinux.cfg
-
-printf "insmod part_gpt\n
-insmod part_msdos\n
-insmod fat\n
-insmod iso9660\n
-\n
-insmod all_video\n
-insmod font\n
-background_image /boot/splash.png\n
-\n
-set default=\"0\"\nset timeout=30\n
-\n
-# If X has issues finding screens, experiment with/without nomodeset.\n
-\nmenuentry \$_ISONAME\ {\n    
-search --no-floppy --set=root --label '$_LABEL'\n
-linux (\$root)/live/vmlinuz boot=live\n    
-initrd (\$root)/live/initrd\n}\n
-\nmenuentry \$_ISONAME\ {\n    
-search --no-floppy --set=root --label '$_LABEL'\n    
-linux (\$root)/live/vmlinuz boot=live nomodeset\n    
-initrd (\$root)/live/initrd\n}\n
-EOF" > /home/fxs/staging/boot/grub/grub.cfg
-
-printf "if ! [ -d \"\$cmdpath\" ]; then\n    
-# On some firmware, GRUB has a wrong cmdpath when booted from an optical disc.\n    
-# https://gitlab.archlinux.org/archlinux/archiso/-/issues/183\n    
-if regexp --set=1:isodevice '^(\([^)]+\))\/?[Ee][Ff][Ii]\/[Bb][Oo][Oo][Tt]\/?$' \"\$cmdpath\"; then\n        
-cmdpath=\"\${isodevice}/EFI/BOOT\"\n    
-fi\nfi\nconfigfile \"\${cmdpath}/grub.cfg\"\n
-EOF" > /home/fxs/tmp/grub-embed.cfg
-
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Creating Boot Menus...." 6 60 0
-
-}
-
-
-
-write_grub () {
-{
-grub-mkstandalone -O i386-efi --modules="part_gpt part_msdos fat iso9660" --locales="" --themes="" --fonts="" --output="/home/fxs/staging/EFI/BOOT/BOOTIA32.EFI" "boot/grub/grub.cfg=/home/fxs/tmp/grub-embed.cfg" &&
-grub-mkstandalone -O x86_64-efi --modules="part_gpt part_msdos fat iso9660" --locales="" --themes="" --fonts="" --output="/home/fxs/staging/EFI/BOOT/BOOTx64.EFI" "boot/grub/grub.cfg=/home/fxs/tmp/grub-embed.cfg"
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-     echo 100
-        # Give it some time to display the progress to the user.
-        sleep 2
-        done
-} | whiptail --gauge "Creating EFI files...." 6 60 0
-}
-
-build_iso () {
-{
-cd /home/fxs/staging &&
-dd if=/dev/zero of=efiboot.img bs=1M count=20 &&
-mkfs.vfat efiboot.img &&
-mmd -i efiboot.img ::/EFI ::/EFI/BOOT &&
-mcopy -vi efiboot.img /home/fxs/staging/EFI/BOOT/BOOTIA32.EFI /home/fxs/staging/EFI/BOOT/BOOTx64.EFI /home/fxs/staging/boot/grub/grub.cfg ::/EFI/BOOT/ &&
-xorriso -as mkisofs -iso-level 3 -o "/home/fxs/$ISONAME.iso" -full-iso9660-filenames -volid "$LABEL" --mbr-force-bootable -partition_offset 16 -joliet -joliet-long -rational-rock -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -eltorito-boot isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table --eltorito-catalog isolinux/isolinux.cat -eltorito-alt-boot -e --interval:appended_partition_2:all:: -no-emul-boot -isohybrid-gpt-basdat -append_partition 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B /home/fxs/staging/efiboot.img "/home/fxs/staging" &&
-chmod 755 /home/fxs/"$ISONAME".iso
-for ((i=0; i<=100; i+=1)); do
-        sleep 0.1
-        echo "$i"
-    done
-} | whiptail --gauge "Creating your .ISO...." 6 60 0
-}
-
-finish () {
-rm "$conf"
-whiptail --title "Fluxuan-Snapshot" --msgbox "Thank you for using Fluxuan-Snapshot.
-And for your interest in Fluxuan Linux.
-
-For any help please join out Forums.
-
-Your Bootable ISO file is in:
--> /home/fxs/
-
-https://fluxuan.org   -   https://Forums.Fluxuan.org" 15 65
-}
-
-do_install () {
-	welcome_msg
-	ask_part
-	install_dep
-	create_folders
-	get_system
-	set_hostname
-	make_change
-	chroot_OS
-	squashing_filesystem
-	touch_boot
-	copy_boot
-	print_menu
-	write_grub
-	build_iso
-	finish
-	}
-	
-do_install
+finish
