@@ -77,8 +77,8 @@ fi
 
 install_dep () {
  {
-apt-get update && apt-get install rsync live-boot debootstrap squashfs-tools xorriso isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin grub-efi-ia32-bin mtools dosfstools resolvconf arch-install-scripts -y -qq &
-
+apt-get update && apt-get install rsync live-boot debootstrap squashfs-tools xorriso isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin grub-efi-ia32-bin mtools dosfstools resolvconf arch-install-scripts live-boot-initramfs-tools -y -qq
+update-initramfs -u
 for ((i=0; i<=100; i+=1)); do
         proc=$(pgrep -w "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
@@ -109,7 +109,9 @@ for ((i=0; i<=100; i+=1)); do
 
 get_system () {
 {
-rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/home/fxs","/home/snapshot"} / /home/fxs/chroot
+rsync -av --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/home/fxs","/home/snapshot","/var/tmp/*","/boot/grub/*","/root/*","/var/mail/*","/var/spool/*","/etc/fstab","/etc/mtab","/etc/timezone","/etc/X11/xorg.conf*"} / /home/fxs/chroot
+
+
 for ((i=0; i<=100; i+=1)); do
         proc=$(pgrep -w "rsync")
             if [[ "$proc" == "" ]]; then break; fi
@@ -173,11 +175,32 @@ fi
 
 squashing_filesystem () {
 {
+if [ -e /home/fxs/chroot/etc/machine-id ]
+then
+	rm -f /home/fxs/chroot/etc/machine-id
+	: > /home/fxs/chroot/etc/machine-id
+fi
+mknod -m 622 /home/fxs/chroot/dev/console c 5 1
+mknod -m 666 /home/fxs/chroot/dev/null c 1 3
+mknod -m 666 /home/fxs/chroot/dev/zero c 1 5
+mknod -m 666 /home/fxs/chroot/dev/ptmx c 5 2
+mknod -m 666 /home/fxs/chroot/dev/tty c 5 0
+mknod -m 444 /home/fxs/chroot/dev/random c 1 8
+mknod -m 444 /home/fxs/chroot/dev/urandom c 1 9
+chown -v root:tty /home/fxs/chroot/dev/{console,ptmx,tty}
+
+ln -sv /proc/self/fd /home/fxs/chroot/dev/fd
+ln -sv /proc/self/fd/0 /home/fxs/chroot/dev/stdin
+ln -sv /proc/self/fd/1 /home/fxs/chroot/dev/stdout
+ln -sv /proc/self/fd/2 /home/fxs/chroot/dev/stderr
+ln -sv /proc/kcore /home/fxs/chroot/dev/core
+ln -sv /run/shm /home/fxs/chroot/dev/shm
+mkdir -v /home/fxs/chroot/dev/pts
 umount /home/fxs/chroot/proc
 umount /home/fxs/chroot/sys
 umount /home/fxs/chroot/dev
 export HISTSIZE=0
-mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -b 1048576 -comp xz -e boot &
+mksquashfs /home/fxs/chroot /home/fxs/staging/live/filesystem.squashfs -comp xz -Xbcj x86 -noappend
 for ((i=0; i<=100; i+=1)); do   
             sleep 20
             echo "$i"
@@ -308,12 +331,12 @@ for ((i=0; i<=100; i+=1)); do
 
 build_iso () {
 {
-cd /home/fxs/staging &&
-dd if=/dev/zero of=efiboot.img bs=1M count=20 &&
-mkfs.vfat efiboot.img &&
-mmd -i efiboot.img ::/EFI ::/EFI/BOOT &&
-mcopy -vi efiboot.img /home/fxs/staging/EFI/BOOT/BOOTIA32.EFI /home/fxs/staging/EFI/BOOT/BOOTx64.EFI /home/fxs/staging/boot/grub/grub.cfg ::/EFI/BOOT/ &&
-xorriso -as mkisofs -iso-level 3 -o "/home/fxs/$ISONAME.iso" -full-iso9660-filenames -volid "$LABEL" --mbr-force-bootable -partition_offset 16 -joliet -joliet-long -rational-rock -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -eltorito-boot isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table --eltorito-catalog isolinux/isolinux.cat -eltorito-alt-boot -e --interval:appended_partition_2:all:: -no-emul-boot -isohybrid-gpt-basdat -append_partition 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B /home/fxs/staging/efiboot.img "/home/fxs/staging" &&
+cd /home/fxs/staging
+dd if=/dev/zero of=efiboot.img bs=1M count=20
+mkfs.vfat efiboot.img
+mmd -i efiboot.img ::/EFI ::/EFI/BOOT
+mcopy -vi efiboot.img /home/fxs/staging/EFI/BOOT/BOOTIA32.EFI /home/fxs/staging/EFI/BOOT/BOOTx64.EFI /home/fxs/staging/boot/grub/grub.cfg ::/EFI/BOOT/
+xorriso -as mkisofs -iso-level 3 -o "/home/fxs/$ISONAME.iso" -full-iso9660-filenames -volid "$LABEL" --mbr-force-bootable -partition_offset 16 -joliet -joliet-long -rational-rock -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -eltorito-boot isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table --eltorito-catalog isolinux/isolinux.cat -eltorito-alt-boot -e --interval:appended_partition_2:all:: -no-emul-boot -isohybrid-gpt-basdat -append_partition 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B /home/fxs/staging/efiboot.img "/home/fxs/staging"
 chmod 755 /home/fxs/"$ISONAME".iso
 for ((i=0; i<=100; i+=1)); do
         sleep 0.1
