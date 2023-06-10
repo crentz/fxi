@@ -31,7 +31,7 @@ check_root () {
 if [ "$(id -u)" -ne 0 ]; then 
 whiptail --title "Fluxuan-Installer" --msgbox "It appears that you are running this installer as user.
 
-Please run as ROOT (e. g.:  sudo bash fluxuan-installer) 
+Please run as ROOT (e. g.:  sudo bash fxi.sh) 
 -------------------------------------------------------
 Thank you for your interest in Fluxuan Linux.
 
@@ -103,6 +103,7 @@ create_swap() {
 if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to use SWAP?" 20 70); then
 	d_conf SWAP "YES"
 	else
+	d_conf SWAP "NO"
   	return 0;
 	fi
 }
@@ -250,7 +251,7 @@ partitioning
 
 option_onoff () {
 
-if (whiptail --title "Fluxuan-Installer" --yesno "Would you like to perform a Net-Install?\n\n -ATENTION- \n\nThis will use data and your internet connection.\nThank you for choosing Fluxuan." 20 70); then
+if (whiptail --title "Fluxuan-Installer" --yesno "Choose YES for Network Install, NO for Offline Install\n\n -ATENTION- \n\nNetwork Install uses data and your internet connection.\nThank you for choosing Fluxuan." 20 70); then
     d_conf offline "YES"
 	else
 	return 0;
@@ -334,7 +335,7 @@ case $CHOICE in
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
+            proc=$(ps aux | grep -v grep | grep -e "debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -360,7 +361,7 @@ case $CHOICE in
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "/usr/sbin/debootstrap")
+            proc=$(ps aux | grep -v grep | grep -e "debootstrap")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -387,7 +388,9 @@ mk_swap () {
 	mount --bind /dev/ /mnt/dev/
 	mount --bind /proc/ /mnt/proc/
 	mount --bind /sys/ /mnt/sys/
-	bash -c 'genfstab -t LABEL /mnt >> /mnt/etc/fstab'
+	export HOME=/root
+	export LC_ALL=C
+	bash -c 'genfstab -U /mnt >> /mnt/etc/fstab'
 	   chroot /mnt apt-get update
 	   chroot /mnt apt-get install locales -y
 	if [ "$_swap" == "YES" ]; then
@@ -404,7 +407,7 @@ mk_swap () {
 	i="0"
         while (true)
         do
-            proc=$(ps aux | grep -v grep | grep -e "chroot")
+            proc=$(ps aux | grep -v grep | grep -e "apt-get")
             if [[ "$proc" == "" ]]; then break; fi
             # Sleep for a longer period if the database is really big 
             # as dumping will take longer.
@@ -520,14 +523,14 @@ choose_init
 
 install_packages () {
 {
-	oldnam=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
-	if [ -d "/home/$oldnam/.config/fxs" ]; then
-	  chroot /mnt xargs apt-get install -y ./home/"$oldnam"/.config/fxs/deb/*
+	user=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
+	if [ -d "/home/$user/.config/fxs" ]; then
+	  chroot /mnt xargs apt-get install -y ./home/"$user"/.config/fxs/deb/*
 	else
 	return 0 ;
 	fi
-	if [ -f "/home/$(logname)/.config/fxs/*.pkgs" ]; then
-      chroot /mnt xargs apt-get install -y </home/"$oldnam"/.config/fxs/*.pkgs
+	if [ -f "/home/$user/.config/fxs/*.pkgs" ]; then
+      chroot /mnt xargs apt-get install -y </home/"$user"/.config/fxs/*.pkgs
     else
     return 0 ;
 	fi
@@ -606,7 +609,7 @@ PASSWD=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose your ROOT Pa
 PASSWD_CHECK=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify Root Password" 10 70 3>&1 1>&2 2>&3)
 
 if [[ "$PASSWD" == "$PASSWD_CHECK" ]]; then
-	echo -e "$PASSWD\n$PASSWD" | passwd root
+	echo -e "$PASSWD\n$PASSWD" | chroot /mnt passwd root
 else
 	whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
  
@@ -640,7 +643,7 @@ set_default_user() {
     PASSWD_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Choose USER Password." 10 70 3>&1 1>&2 2>&3)
 	PASSWD_CHECK_USER=$(whiptail --title "Fluxuan-Installer" --passwordbox "Verify USER Password " 10 70 3>&1 1>&2 2>&3)
 	if [[ "$PASSWD_USER" == "$PASSWD_CHECK_USER" ]]; then
-	echo -e "$PASSWD_USER\n$PASSWD_USER" | passwd "$name"
+	echo -e "$PASSWD_USER\n$PASSWD_USER" | chroot /mnt passwd "$name"
 	else
 	whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
  
@@ -662,11 +665,11 @@ setup_grub() {
 	if [ "$_mode" == "bios" ]; then
 		  chroot /mnt apt-get install grub-pc -y 
 		  chroot /mnt grub-install /dev/"$_disk" >> /dev/null 2>&1
-		  chroot /mnt update-grub
+		  chroot /mnt update-grub >> /dev/null 2>&1
 	else
 		  chroot /mnt apt-get install grub-efi-amd64 -y 
 		  chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> /dev/null 2>&1
-		  chroot /mnt update-grub
+		  chroot /mnt update-grub >> /dev/null 2>&1
 	fi
 	i="0"
         while (true)
@@ -688,16 +691,16 @@ setup_grub() {
 setup_grub
 
 finish() {
-	oldn=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
+	on=$(awk -F: '/1000:1000/ { print $1 }' /mnt/etc/passwd)
 	if (whiptail --title "Fluxuan-Installer" --yesno "Fluxuan is now installed. YES to reboot or NO to continue using live disk." 8 78); then
 	rm "$CONF" ;
-	rm -rf "/home/$oldn/.config/fxs/deb" ;
-	rm "/home/$oldn/.config/fxs/*.pkgs" ;
+	rm -rf "/home/$on/.config/fxs/deb" ;
+	rm "/home/$on/.config/fxs/*.pkgs" ;
     shutdown -r now
 	else
     rm "$CONF" ;
-    rm -rf "/home/$oldn/.config/fxs/deb" ;
-	rm "/home/$oldn/.config/fxs/*.pkgs" ;
+    rm -rf "/home/$on/.config/fxs/deb" ;
+	rm "/home/$on/.config/fxs/*.pkgs" ;
     exit 0 ;
 	fi
 }
