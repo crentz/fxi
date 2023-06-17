@@ -48,15 +48,14 @@ create_squashfs() {
 
 create_grub_config() {
   whiptail --title "Creating GRUB Configuration" --infobox "Creating GRUB configuration..." 10 40
-  cat > "$ISO_DIR/boot/grub/grub.cfg" <<EOF
+  cat > "$BOOT_DIR/grub/grub.cfg" <<EOF
 set default="0"
 set timeout=5
 
 EOF
 
-  local count=0
   for iso in "${ISONAME[@]}"; do
-    cat >> "$ISO_DIR/boot/grub/grub.cfg" <<EOF
+    cat >> "$BOOT_DIR/grub/grub.cfg" <<EOF
 menuentry "$iso" {
     set isofile="/boot/$iso"
     loopback loop \$isofile
@@ -65,7 +64,6 @@ menuentry "$iso" {
 }
 
 EOF
-    ((count++))
   done
 
   whiptail --title "Creating GRUB Configuration" --infobox "GRUB configuration created successfully." 10 40
@@ -75,7 +73,7 @@ create_iso() {
   whiptail --title "Creating ISO" --infobox "Creating ISO..." 10 40
 
   # Copy splash.png
-  cp /boot/splash.png "$ISO_DIR/boot/grub/"
+  cp /boot/splash.png "$BOOT_DIR/grub/"
 
   # Create the ISO
   OUTPUT_ISO="$SCRIPT_DIR/fluxuan.iso"
@@ -102,8 +100,8 @@ main() {
   install_dependencies
   create_folders
   copy_system_files
-  create_squashfs
   create_grub_config
+  create_squashfs
   create_iso
   calculate_md5
 
