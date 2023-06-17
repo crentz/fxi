@@ -23,7 +23,7 @@ ask_part() {
 install_dependencies() {
   whiptail --title "Installing Dependencies" --infobox "Installing required dependencies..." 10 40
   apt-get update
-  apt-get install -y xorriso squashfs-tools arch-install-scripts
+  apt-get install -y xorriso squashfs-tools
 }
 
 create_folders() {
@@ -55,10 +55,9 @@ set timeout=5
 EOF
 
   local count=0
-  for iso in "${!ISO_MAP[@]}"; do
-    local label="${ISO_MAP[$iso]}"
+  for iso in "${ISONAME[@]}"; do
     cat >> "$ISO_DIR/boot/grub/grub.cfg" <<EOF
-menuentry "\$LABEL" {
+menuentry "$iso" {
     set isofile="/boot/$iso"
     loopback loop \$isofile
     linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=\$isofile splash
@@ -72,7 +71,6 @@ EOF
   whiptail --title "Creating GRUB Configuration" --infobox "GRUB configuration created successfully." 10 40
 }
 
-
 create_iso() {
   whiptail --title "Creating ISO" --infobox "Creating ISO..." 10 40
 
@@ -80,9 +78,10 @@ create_iso() {
   cp /boot/splash.png "$ISO_DIR/boot/grub/"
 
   # Create the ISO
+  OUTPUT_ISO="$SCRIPT_DIR/fluxuan.iso"
   xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames \
-    -volid "$ISO_LABEL" -appid "$ISO_LABEL" -publisher "$ISO_PUBLISHER" \
-    -preparer "$ISO_PREPARER" -eltorito-boot isolinux/isolinux.bin \
+    -volid "$LABEL" -appid "$LABEL" -publisher "Fluxuan" \
+    -preparer "Fluxuan ISO Creation Script" -eltorito-boot isolinux/isolinux.bin \
     -eltorito-catalog isolinux/boot.cat -no-emul-boot -boot-load-size 4 \
     -boot-info-table -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
     -output "$OUTPUT_ISO" "$ISO_DIR"
@@ -90,6 +89,11 @@ create_iso() {
   whiptail --title "Creating ISO" --infobox "ISO created successfully." 10 40
 }
 
+calculate_md5() {
+  whiptail --title "Calculating MD5 Checksum" --infobox "Calculating MD5 checksum..." 10 40
+  MD5SUM=$(md5sum "$OUTPUT_ISO" | cut -d ' ' -f 1)
+  whiptail --title "Calculating MD5 Checksum" --msgbox "MD5 checksum: $MD5SUM" 10 40
+}
 
 main() {
   check_root
@@ -101,8 +105,9 @@ main() {
   create_squashfs
   create_grub_config
   create_iso
+  calculate_md5
 
-  whiptail --title "Fluxuan Linux ISO Creation" --msgbox "ISO creation process completed successfully!" 10 40
+  whiptail --title "ISO Creation Completed" --msgbox "ISO creation process completed successfully!" 10 40
 }
 
 main
