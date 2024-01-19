@@ -269,13 +269,18 @@ for ((i=0; i<=100; i+=1)); do
 }
 mk_swap
 
+# Example of refactoring functions and consistent quoting
 set_hostname() {
-hostname=$(whiptail --inputbox "Input your desired hostname" 10 70 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
-exitstatus=$?
-if [ $exitstatus = 0 ]; then
-    d_conf HOSTNAME "$hostname"
-    echo "$hostname" > /mnt/etc/hostname
-	cat <<EOF > /mnt/etc/hosts
+    local hostname
+
+    hostname=$(whiptail --inputbox "Input your desired hostname" 10 70 fluxuan --title "Configuration..." 3>&1 1>&2 2>&3)
+    exitstatus=$?
+
+    if [ "$exitstatus" -eq 0 ]; then
+        d_conf HOSTNAME "$hostname"
+        echo "$hostname" > /mnt/etc/hostname
+
+        cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
 127.0.1.1	$hostname
 # The following lines are desirable for IPv6 capable hosts
@@ -283,17 +288,12 @@ if [ $exitstatus = 0 ]; then
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-else
-whiptail --title "Fluxuan-Installer" --msgbox "Thank you for using Fluxuan-Installer.
- 
-If I can help in any way please do not hesitate to ask on our Forums!
 
-https://fluxuan.org     https://forums.fluxuan.org" 20 70
-	rm "$CONF"
-    exit 1 ;
-fi
+    else
+        whiptail --title "Fluxuan-Installer" --msgbox "Error: Unable to set hostname." 20 70
+        exit 1
+    fi
 }
-set_hostname
 
 timezone() {
 
